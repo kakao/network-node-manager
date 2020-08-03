@@ -1,0 +1,93 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ipvs-node-controller-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services/status
+  verbs:
+  - get
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ipvs-node-controller
+  namespace: kube-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ipvs-node-controller-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ipvs-node-controller-role
+subjects:
+- kind: ServiceAccount
+  name: ipvs-node-controller
+  namespace: kube-system
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ipvs-node-controller
+  namespace: kube-system
+  labels:
+    control-plane: ipvs-node-controller
+spec:
+  selector:
+    matchLabels:
+      control-plane: ipvs-node-controller
+  template:
+    metadata:
+      labels:
+        control-plane: ipvs-node-controller
+    spec:
+      serviceAccountName: ipvs-node-controller
+      hostNetwork: true
+      containers:
+      - command:
+        - /ipvs-node-controller
+        args:
+        - --metrics-addr=0
+        image: ssup2/ipvs-node-controller:latest
+        name: ipvs-node-controller
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        env:
+        - name: POD_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        securityContext:
+          capabilities:
+            add: ["NET_ADMIN"]
+
