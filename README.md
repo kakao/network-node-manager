@@ -12,7 +12,7 @@ kubectl apply -f https://raw.githubusercontent.com/kakao/ipvs-node-controller/ma
 
 ## How it works?
 
-ipvs-node-controller adds the DNAT rules from External-IP to Cluster-IP to iptables. Add one DNAT rule to the prerouting chain and output chain for each LoadBalancer type service. A DNAT rule in the prerouting chain is for the pod that use pod-only network namespace. On the other hand, a DNAT rule in the output chain is for the pod that use host network namespace. All DNAT rules only target packets from pods on the host. Below is the example.
+ipvs-node-controller works on all worker nodes and adds the DNAT rules from Load Balancer IP (External-IP) to Cluster-IP to iptables. Add two DNAT rules for each LoadBalancer type service. One is added to the prerouting chain and the other is added to the output chain. The DNAT rule in the prerouting chain is for the pod that uses pod-only network namespace. On the other hand, The DNAT rule in the output chain is for the pod that uses host network namespace. All DNAT rules only target packets from pods on the host. Below is an example.
 
 ```
 $ kubectl -n default get service 
