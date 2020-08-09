@@ -203,13 +203,13 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Set jump rule to each chain in nat table
 	logger.Info("create jump rules for the IPVS chains")
 	ruleJumpPre := []string{"-j", ChainNATIPVSPrerouting}
-	out, err = iptables.CreateRuleFisrt(iptables.TableNAT, ChainNATPrerouting, "", ruleJumpPre...)
+	out, err = iptables.CreateRuleFirst(iptables.TableNAT, ChainNATPrerouting, "", ruleJumpPre...)
 	if err != nil {
 		logger.Error(err, out)
 		return err
 	}
 	ruleJumpOut := []string{"-j", ChainNATIPVSOutput}
-	out, err = iptables.CreateRuleFisrt(iptables.TableNAT, ChainNATOutput, "", ruleJumpOut...)
+	out, err = iptables.CreateRuleFirst(iptables.TableNAT, ChainNATOutput, "", ruleJumpOut...)
 	if err != nil {
 		logger.Error(err, out)
 		return err

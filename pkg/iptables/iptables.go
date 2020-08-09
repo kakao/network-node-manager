@@ -50,7 +50,7 @@ func CreateChain(table Table, chain string) (string, error) {
 	return string(out), nil
 }
 
-func CreateRuleFisrt(table Table, chain string, comment string, rule ...string) (string, error) {
+func CreateRuleFirst(table Table, chain string, comment string, rule ...string) (string, error) {
 	// Lock
 	lock.Lock()
 	defer lock.Unlock()
