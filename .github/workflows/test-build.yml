@@ -31,10 +31,10 @@ jobs:
             dep ensure
         fi
         
-    - name: Test
+    - name: Test code
       run: go test -v .
 
-    - name: Build
+    - name: Build code
       run: go build -v .
       
   build:
@@ -45,10 +45,50 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
       
-    - name: Build and push Docker images
-      uses: docker/build-push-action@v1.1.0
+    - name: Prepare
+      id: prepare
+      run: |
+        DOCKER_IMAGE=kakaocorp/ipvs-node-controller
+        DOCKER_PLATFORMS=linux/amd64,linux/arm64
+        VERSION=latest
+
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+        fi
+
+        TAGS="--tag ${DOCKER_IMAGE}:${VERSION}"
+        if [[ $VERSION =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+          TAGS="$TAGS --tag ${DOCKER_IMAGE}:latest"
+        fi
+
+        echo ::set-output name=docker_image::${DOCKER_IMAGE}
+        echo ::set-output name=version::${VERSION}
+        echo ::set-output name=buildx_args::--platform ${DOCKER_PLATFORMS} \
+          --build-arg VERSION=${VERSION} \
+          --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+          --build-arg VCS_REF=${GITHUB_SHA::8} \
+          ${TAGS} --file ./Dockerfile .
+      
+    - name: Set up Docker Buildx
+      uses: crazy-max/ghaction-docker-buildx@v3
+    
+    - name: Build image
+      run: |
+        docker buildx build --output "type=image,push=false" ${{ steps.prepare.outputs.buildx_args }}
+     
+    - name: Login to DockerHub
+      if: success() && github.event_name != 'pull_request'
+      uses: docker/login-action@v1
       with:
         username: ${{ secrets.DOCKER_HUB_SSUP2_ID }}
         password: ${{ secrets.DOCKER_HUB_SSUP2_PASSWORD }}
-        repository: kakaocorp/ipvs-node-controller
-        tag_with_ref: true
+     
+    - name: Push image
+      if: success() && github.event_name != 'pull_request'
+      run: |
+        docker buildx build --output "type=image,push=true" ${{ steps.prepare.outputs.buildx_args }}
+     
+    - name: Inspect image
+      if: always() && github.event_name != 'pull_request'
+      run: |
+        docker buildx imagetools inspect ${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.version }}
