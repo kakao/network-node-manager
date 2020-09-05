@@ -4,6 +4,11 @@ ipvs-node-controller is the kubernetes controller that solves External-IP (Load 
 
 ## Deploy
 
+ipvs-node-controller now supports below CPU architectures.
+
+* amd64
+* arm64
+
 Deploy ipvs-node-controllers through below command.
 
 ```
