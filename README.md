@@ -15,6 +15,22 @@ Deploy ipvs-node-controllers through below command.
 kubectl apply -f https://raw.githubusercontent.com/kakao/ipvs-node-controller/master/deploy/ipvs-node-controller.yml
 ```
 
+## Configuration
+
+### IPv6
+
+ipvs-node-controller also supports IPv6. However, IPv6 is not enabled by default. To use IPv6, set "NET_STACK" environment in the DaemonSet manifests of ipvs-node-controller as follows.
+
+```
+...
+env:
+- name: NET_STACK
+  value: ipv4,ipv6
+- name: NODE_NAME
+  valueFrom:
+...
+```
+
 ## How it works?
 
 ipvs-node-controller works on all worker nodes and adds the DNAT rules that converts destination IP of a packet from External-IP to Cluster-IP to iptables. ipvs-node-controller adds two DNAT rules for each LoadBalancer type service. One is added to the prerouting chain and the other is added to the output chain. The DNAT rule in the prerouting chain is for the pod that uses pod-only network namespace. On the other hand, The DNAT rule in the output chain is for the pod that uses host network namespace. All DNAT rules only target packets from pods on the host. Below is an example.
