@@ -19,7 +19,7 @@ kubectl apply -f https://raw.githubusercontent.com/kakao/ipvs-node-controller/ma
 
 ### IPv6
 
-ipvs-node-controller also supports IPv6. However, IPv6 is not enabled by default. To use IPv6, set "NET_STACK" environment in the DaemonSet manifests of ipvs-node-controller as follows.
+ipvs-node-controller supports IPv6. However, IPv6 is not enabled by default. To use IPv6, set "NET_STACK" environment in the DaemonSet manifests of ipvs-node-controller as follows.
 
 ```
 ...
