@@ -28,7 +28,7 @@ jobs:
         fi
         
     - name: Test code
-      run: go test -v .
+      run: go test $(go list ./... | grep -v /pkg/iptables)
 
     - name: Build code
       run: go build -v .
