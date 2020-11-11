@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -52,10 +53,13 @@ const (
 
 // Variables
 var (
-	configNodeName string
-
+	configNodeName    string
 	configIPv4Enabled bool
 	configIPv6Enabled bool
+
+	initFlag    = false
+	podCIDRIPv4 string
+	podCIDRIPv6 string
 
 	serviceCache = map[ctrl.Request]corev1.Service{}
 )
@@ -65,25 +69,54 @@ var (
 
 func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	logger := r.Log.WithValues("service", req.NamespacedName)
+	logger := r.Log.WithName("reconcile").WithValues("service", req.NamespacedName)
+	var err error
 
-	// Get Nodes's pod CIDR
-	node := &corev1.Node{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: configNodeName}, node); err != nil {
-		logger.Error(err, "failed to get the pod's node info from API server")
-		return ctrl.Result{}, err
+	// Init service controller
+	// In SetupWithManager, function k8s client cannot be used.
+	// So initialize controller in Reconile() function.
+	if !initFlag {
+		defer func() {
+			initFlag = true
+		}()
+
+		// Init logger for only initialize controller
+		logger := r.Log.WithName("initalize")
+		logger.Info("initalize service contoller")
+
+		// Get configs from env
+		configNodeName, err = configs.GetConfigNodeName()
+		if err != nil {
+			logger.Error(err, "config error")
+			os.Exit(1)
+		}
+		logger.WithValues("node name", configNodeName).Info("config node name")
+		configIPv4Enabled, configIPv6Enabled, err = configs.GetConfigNetStack()
+		if err != nil {
+			logger.Error(err, "config error")
+			os.Exit(1)
+		}
+		logger.WithValues("IPv4", configIPv4Enabled).WithValues("IPv6", configIPv6Enabled).Info("config network stack")
+
+		// Get Nodes's pod CIDR
+		node := &corev1.Node{}
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: configNodeName}, node); err != nil {
+			logger.Error(err, "failed to get the pod's node info from API server")
+			os.Exit(1)
+		}
+		podCIDRIPv4, podCIDRIPv6 = getPodCIDR(node.Spec.PodCIDRs)
+		logger.WithValues("pod CIDR IPV4", podCIDRIPv4).WithValues("pod CIDR IPv6", podCIDRIPv6).Info("pod CIDR")
+
+		// Init iptables
+		initIptables(logger)
 	}
-	podCIDRs := node.Spec.PodCIDRs
-	podCIDRIPv4, podCIDRIPv6 := getPodCIDR(podCIDRs)
-	logger.WithValues("pod CIDR IPV4", podCIDRIPv4).WithValues("pod CIDR IPv6", podCIDRIPv6).Info("pod CIDR")
 
 	// Get service info
 	svc := &corev1.Service{}
-	err := r.Client.Get(ctx, req.NamespacedName, svc)
-	if err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, svc); err != nil {
 		if apierror.IsNotFound(err) {
 			// Not found service means that the service is removed.
-			// Remove iptables rules by using cache
+			// Delete iptables rules by using cache
 
 			// Get service from cache
 			oldSvc, exist := serviceCache[req]
@@ -92,13 +125,13 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				return ctrl.Result{}, nil
 			}
 
-			// Remove iptables rules
+			// Delete iptables rules
 			for _, oldIngress := range oldSvc.Status.LoadBalancer.Ingress {
 				oldClusterIP := oldSvc.Spec.ClusterIP
 				oldExternalIP := oldIngress.IP
 
 				// Delete iptables rules
-				logger.WithValues("externalIP", oldExternalIP).Info("remove iptables rules by using cache")
+				logger.WithValues("externalIP", oldExternalIP).Info("delete iptables rules")
 				if err := deleteIptablesRules(logger, req, oldClusterIP, oldExternalIP, podCIDRIPv4, podCIDRIPv6); err != nil {
 					return ctrl.Result{}, err
 				}
@@ -120,7 +153,6 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		clusterIP := svc.Spec.ClusterIP
 		externalIP := ingress.IP
 
-		// If not use LoadBalancer service finalizer, Use Cache
 		// Cache service to use when deleting service
 		serviceCache[req] = *svc.DeepCopy()
 
@@ -135,28 +167,6 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 }
 
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	logger := r.Log.WithName("initialize")
-	var err error
-
-	// Get configs from env
-	configNodeName, err = configs.GetConfigNodeName()
-	if err != nil {
-		logger.Error(err, "config error")
-		return err
-	}
-	configIPv4Enabled, configIPv6Enabled, err = configs.GetConfigNetStack()
-	if err != nil {
-		logger.Error(err, "config error")
-		return err
-	}
-
-	// Print configs
-	logger.WithValues("node name", configNodeName).Info("config node name")
-	logger.WithValues("IPv4", configIPv4Enabled).WithValues("IPv6", configIPv6Enabled).Info("config network stack")
-
-	// Init iptables
-	initIptables(logger)
-
 	// Set controller manager
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
