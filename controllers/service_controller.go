@@ -19,8 +19,6 @@ package controllers
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -29,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/go-logr/logr"
+	"github.com/kakao/ipvs-node-controller/pkg/configs"
 	"github.com/kakao/ipvs-node-controller/pkg/ip"
 	"github.com/kakao/ipvs-node-controller/pkg/iptables"
 )
@@ -45,12 +43,6 @@ type ServiceReconciler struct {
 
 // Constants
 const (
-	EnvNetStack        = "NET_STACK"
-	EnvNetStackIPv4    = "ipv4"
-	EnvNetStackIPv6    = "ipv6"
-	EnvNetStackDefault = EnvNetStackIPv4
-	EnvNodeName        = "NODE_NAME"
-
 	ChainNATPrerouting     = "PREROUTING"
 	ChainNATOutput         = "OUTPUT"
 	ChainNATKubeMasquerade = "KUBE-MARK-MASQ"
@@ -60,11 +52,12 @@ const (
 
 // Variables
 var (
+	configNodeName string
+
 	configIPv4Enabled bool
 	configIPv6Enabled bool
-	configNodeName    string
 
-	serviceCache = map[reconcile.Request]corev1.Service{}
+	serviceCache = map[ctrl.Request]corev1.Service{}
 )
 
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
@@ -88,98 +81,32 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	svc := &corev1.Service{}
 	err := r.Client.Get(ctx, req.NamespacedName, svc)
 	if err != nil {
-		if !apierror.IsNotFound(err) {
-			logger.Error(err, "failed to get service info")
-			return ctrl.Result{}, err
-		} else {
-			// Not found service means that the service is removed
-			// Get svc from cache
+		if apierror.IsNotFound(err) {
+			// Not found service means that the service is removed.
+			// Remove iptables rules by using cache
+
+			// Get service from cache
 			oldSvc, exist := serviceCache[req]
 			if !exist {
-				logger.Error(err, "failed to get removed service info from cache")
-				return reconcile.Result{}, nil
-			}
-
-			// Check removed service is LoadBalancer type
-			if oldSvc.Spec.Type != corev1.ServiceTypeLoadBalancer {
+				// If there is no service info in cache, skip it
 				return ctrl.Result{}, nil
 			}
 
-			// Remove rules
-			for _, ingress := range oldSvc.Status.LoadBalancer.Ingress {
+			// Remove iptables rules
+			for _, oldIngress := range oldSvc.Status.LoadBalancer.Ingress {
 				oldClusterIP := oldSvc.Spec.ClusterIP
-				oldExternalIP := ingress.IP
-				logger.WithValues("externalIP", oldExternalIP).Info("remove rules")
+				oldExternalIP := oldIngress.IP
 
-				// Don't use spec.ipFamily to distingush between IPv4 and IPv6 Address
-				// for kubernetes version that dosen't support IPv6 dualstack
-				if configIPv4Enabled && ip.IsIPv4Addr(oldExternalIP) {
-					// IPv4
-					// Unset prerouting
-					rulePreMasq := []string{"-s", podCIDRIPv4, "-d", oldExternalIP, "-j", ChainNATKubeMasquerade}
-					out, err := iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
-					if err != nil {
-						logger.Error(err, out)
-						return ctrl.Result{}, err
-					}
-					rulePreDNAT := []string{"-s", podCIDRIPv4, "-d", oldExternalIP, "-j", "DNAT", "--to-destination", oldClusterIP}
-					out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
-					if err != nil {
-						logger.Error(err, out)
-						return ctrl.Result{}, err
-					}
-
-					// Unset output
-					ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", oldExternalIP, "-j", ChainNATKubeMasquerade}
-					out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
-					if err != nil {
-						logger.Error(err, out)
-						return ctrl.Result{}, err
-					}
-					ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", oldExternalIP, "-j", "DNAT", "--to-destination", oldClusterIP}
-					out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
-					if err != nil {
-						logger.Error(err, out)
-						return ctrl.Result{}, err
-					}
-				} else if configIPv6Enabled && ip.IsIPv6Addr(oldExternalIP) {
-					// IPv6
-					// Unset prerouting
-					rulePreMasq := []string{"-s", podCIDRIPv6, "-d", oldExternalIP, "-j", ChainNATKubeMasquerade}
-					out, err := iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
-					if err != nil {
-						logger.Error(err, out)
-						return ctrl.Result{}, err
-					}
-					rulePreDNAT := []string{"-s", podCIDRIPv6, "-d", oldExternalIP, "-j", "DNAT", "--to-destination", oldClusterIP}
-					out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
-					if err != nil {
-						logger.Error(err, out)
-						return ctrl.Result{}, err
-					}
-
-					// Unset output
-					ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", oldExternalIP, "-j", ChainNATKubeMasquerade}
-					out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
-					if err != nil {
-						logger.Error(err, out)
-						return ctrl.Result{}, err
-					}
-					ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", oldExternalIP, "-j", "DNAT", "--to-destination", oldClusterIP}
-					out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
-					if err != nil {
-						logger.Error(err, out)
-						return ctrl.Result{}, err
-					}
-				} else {
-					if ip.IsVaildIP(oldExternalIP) {
-						logger.WithValues("externalIP", oldExternalIP).Error(errors.New("invalid IP"), "invaild IP")
-					}
-					continue
+				// Delete iptables rules
+				logger.WithValues("externalIP", oldExternalIP).Info("remove iptables rules by using cache")
+				if err := deleteIptablesRules(logger, req, oldClusterIP, oldExternalIP, podCIDRIPv4, podCIDRIPv6); err != nil {
+					return ctrl.Result{}, err
 				}
 			}
-
 			return ctrl.Result{}, nil
+		} else {
+			logger.Error(err, "failed to get service info")
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -188,80 +115,19 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, nil
 	}
 
-	// Cache service to use when deleting service
-	serviceCache[req] = *svc.DeepCopy()
-
-	// Create rules
+	// Create or Delete iptables rules
 	for _, ingress := range svc.Status.LoadBalancer.Ingress {
 		clusterIP := svc.Spec.ClusterIP
 		externalIP := ingress.IP
-		logger.WithValues("externalIP", externalIP).Info("create rules")
 
-		// Don't use spec.ipFamily to distingush between IPv4 and IPv6 Address
-		// for kubernetes version that dosen't support IPv6 dualstack
-		if configIPv4Enabled && ip.IsIPv4Addr(externalIP) {
-			// IPv4
-			// Set prerouting
-			rulePreMasq := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", ChainNATKubeMasquerade}
-			out, err := iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
-			if err != nil {
-				logger.Error(err, out)
-				return ctrl.Result{}, err
-			}
-			rulePreDNAT := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-			out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
-			if err != nil {
-				logger.Error(err, out)
-				return ctrl.Result{}, err
-			}
+		// If not use LoadBalancer service finalizer, Use Cache
+		// Cache service to use when deleting service
+		serviceCache[req] = *svc.DeepCopy()
 
-			// Set output
-			ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", ChainNATKubeMasquerade}
-			out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
-			if err != nil {
-				logger.Error(err, out)
-				return ctrl.Result{}, err
-			}
-			ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-			out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
-			if err != nil {
-				logger.Error(err, out)
-				return ctrl.Result{}, err
-			}
-		} else if configIPv6Enabled && ip.IsIPv6Addr(externalIP) {
-			// IPv6
-			// Set prerouting
-			rulePreMasq := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", ChainNATKubeMasquerade}
-			out, err := iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
-			if err != nil {
-				logger.Error(err, out)
-				return ctrl.Result{}, err
-			}
-			rulePreDNAT := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-			out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
-			if err != nil {
-				logger.Error(err, out)
-				return ctrl.Result{}, err
-			}
-
-			// Set output
-			ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", ChainNATKubeMasquerade}
-			out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
-			if err != nil {
-				logger.Error(err, out)
-				return ctrl.Result{}, err
-			}
-			ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-			out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
-			if err != nil {
-				logger.Error(err, out)
-				return ctrl.Result{}, err
-			}
-		} else {
-			if ip.IsVaildIP(externalIP) {
-				logger.WithValues("externalIP", externalIP).Error(errors.New("invalid IP"), "invaild IP")
-			}
-			continue
+		// Create iptables rules
+		logger.WithValues("externalIP", externalIP).Info("create iptables rules")
+		if err := createIptablesRules(logger, req, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6); err != nil {
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -270,25 +136,34 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	logger := r.Log.WithName("initialize")
-	errConfig := errors.New("config error")
+	var err error
 
-	// Get network stack config from env
-	configNetStack := os.Getenv(EnvNetStack)
-	if configNetStack == "" {
-		configIPv4Enabled, configIPv6Enabled = getConfigNetStack(EnvNetStackDefault)
-	} else {
-		configIPv4Enabled, configIPv6Enabled = getConfigNetStack(configNetStack)
+	// Get configs from env
+	configNodeName, err = configs.GetConfigNodeName()
+	if err != nil {
+		logger.Error(err, "config error")
+		return err
 	}
+	configIPv4Enabled, configIPv6Enabled, err = configs.GetConfigNetStack()
+	if err != nil {
+		logger.Error(err, "config error")
+		return err
+	}
+
+	// Print configs
+	logger.WithValues("node name", configNodeName).Info("config node name")
 	logger.WithValues("IPv4", configIPv4Enabled).WithValues("IPv6", configIPv6Enabled).Info("config network stack")
 
-	// Get node name config from env
-	configNodeName = os.Getenv(EnvNodeName)
-	if configNodeName == "" {
-		logger.Error(errConfig, fmt.Sprintf("failed to get the pod's node name from %s env", EnvNodeName))
-		return errConfig
-	}
-	logger.WithValues("node name", configNodeName).Info("config node name")
+	// Init iptables
+	initIptables(logger)
 
+	// Set controller manager
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&corev1.Service{}).
+		Complete(r)
+}
+
+func initIptables(logger logr.Logger) error {
 	// IPv4
 	if configIPv4Enabled {
 		// Create chain in nat table
@@ -350,10 +225,146 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 	}
 
-	// Set controller manager
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Service{}).
-		Complete(r)
+	return nil
+}
+
+func createIptablesRules(logger logr.Logger, req ctrl.Request, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6 string) error {
+	// Don't use spec.ipFamily to distingush between IPv4 and IPv6 Address
+	// for kubernetes version that dosen't support IPv6 dualstack
+	if configIPv4Enabled && ip.IsIPv4Addr(externalIP) {
+		// IPv4
+		// Set prerouting
+		rulePreMasq := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", ChainNATKubeMasquerade}
+		out, err := iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+		rulePreDNAT := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
+		out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+
+		// Set output
+		ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", ChainNATKubeMasquerade}
+		out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+		ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
+		out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+	} else if configIPv6Enabled && ip.IsIPv6Addr(externalIP) {
+		// IPv6
+		// Set prerouting
+		rulePreMasq := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", ChainNATKubeMasquerade}
+		out, err := iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+		rulePreDNAT := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
+		out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+
+		// Set output
+		ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", ChainNATKubeMasquerade}
+		out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+		ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
+		out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+	} else {
+		if ip.IsVaildIP(externalIP) {
+			logger.WithValues("externalIP", externalIP).Error(errors.New("invalid IP"), "invaild IP")
+		}
+	}
+
+	return nil
+}
+
+func deleteIptablesRules(logger logr.Logger, req ctrl.Request, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6 string) error {
+	// Don't use spec.ipFamily to distingush between IPv4 and IPv6 Address
+	// for kubernetes version that dosen't support IPv6 dualstack
+	if configIPv4Enabled && ip.IsIPv4Addr(externalIP) {
+		// IPv4
+		// Unset prerouting
+		rulePreMasq := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", ChainNATKubeMasquerade}
+		out, err := iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+		rulePreDNAT := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
+		out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+
+		// Unset output
+		ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", ChainNATKubeMasquerade}
+		out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+		ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
+		out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+	} else if configIPv6Enabled && ip.IsIPv6Addr(externalIP) {
+		// IPv6
+		// Unset prerouting
+		rulePreMasq := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", ChainNATKubeMasquerade}
+		out, err := iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+		rulePreDNAT := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
+		out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+
+		// Unset output
+		ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", ChainNATKubeMasquerade}
+		out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+		ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
+		out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+	} else {
+		if ip.IsVaildIP(externalIP) {
+			logger.WithValues("externalIP", externalIP).Error(errors.New("invalid IP"), "invaild IP")
+		}
+	}
+	return nil
 }
 
 func getPodCIDR(cidrs []string) (ipv4CIDR string, ipv6CIDR string) {
@@ -363,17 +374,6 @@ func getPodCIDR(cidrs []string) (ipv4CIDR string, ipv6CIDR string) {
 			ipv4CIDR = cidr
 		} else if ip.IsIPv6Addr(addr) {
 			ipv6CIDR = cidr
-		}
-	}
-	return
-}
-
-func getConfigNetStack(configs string) (ipv4 bool, ipv6 bool) {
-	for _, config := range strings.Split(configs, ",") {
-		if config == EnvNetStackIPv4 {
-			ipv4 = true
-		} else if config == EnvNetStackIPv6 {
-			ipv6 = true
 		}
 	}
 	return

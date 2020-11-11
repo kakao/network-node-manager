@@ -21,25 +21,3 @@ func TestGetPodCIDR(t *testing.T) {
 		t.Errorf("wrong result - %s", ipv6ValidCIDR)
 	}
 }
-
-func TestGetConfigNetStack(t *testing.T) {
-	ipv4, ipv6 := getConfigNetStack("ipv4")
-	if ipv4 != true || ipv6 != false {
-		t.Errorf("wrong result - %s", "ipv4")
-	}
-
-	ipv4, ipv6 = getConfigNetStack("ipv6")
-	if ipv4 != false || ipv6 != true {
-		t.Errorf("wrong result - %s", "ipv6")
-	}
-
-	ipv4, ipv6 = getConfigNetStack("ipv4,ipv6")
-	if ipv4 != true || ipv6 != true {
-		t.Errorf("wrong result - %s", "ipv4,ipv6")
-	}
-
-	ipv4, ipv6 = getConfigNetStack("ipv6,ipv4")
-	if ipv4 != true || ipv6 != true {
-		t.Errorf("wrong result - %s", "ipv6,ipv4")
-	}
-}
