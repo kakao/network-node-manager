@@ -12,9 +12,11 @@ type Table string
 
 // Const
 const (
-	iptablesCmdIPv4   = "iptables"
-	iptablesCmdIPv6   = "ip6tables"
-	iptablesErrNoRule = "No chain/target/match by that name"
+	iptablesCmdIPv4     = "iptables"
+	iptablesCmdIPv6     = "ip6tables"
+	iptablesSaveCmdIPv4 = "iptables-save"
+	iptablesSaveCmdIPv6 = "ip6tables-save"
+	iptablesErrNoRule   = "No chain/target/match by that name"
 
 	TableNAT    Table = "nat"
 	TableFilter Table = "filter"
@@ -150,6 +152,40 @@ func isExistRule(iptablesCmd string, table Table, chain string, comment string, 
 	return true
 }
 
+// GetRules
+func GetRulesIPv4(table Table, chain string) ([]string, error) {
+	return getRules(iptablesSaveCmdIPv4, table, chain)
+}
+
+func GetRulesIPv6(table Table, chain string) ([]string, error) {
+	return getRules(iptablesSaveCmdIPv6, table, chain)
+}
+
+func getRules(iptablesSaveCmd string, table Table, chain string) ([]string, error) {
+	// Lock
+	lock.Lock()
+	defer lock.Unlock()
+
+	// Set Common args
+	args := []string{"-t", string(table)}
+
+	// Check rule
+	cmd := exec.Command(iptablesSaveCmd, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+
+	var result []string
+	for _, rule := range strings.Split(string(out), "\n") {
+		if strings.HasPrefix(rule, "-A "+chain) {
+			result = append(result, rule)
+		}
+	}
+
+	return result, nil
+}
+
 // CreateRuleFirst
 func CreateRuleFirstIPv4(table Table, chain string, comment string, rule ...string) (string, error) {
 	return createRuleFirst(iptablesCmdIPv4, table, chain, comment, rule...)
@@ -258,6 +294,44 @@ func deleteRule(iptablesCmd string, table Table, chain string, comment string, r
 
 	// Delete rule
 	cmd = exec.Command(iptablesCmd, append(append(args, "-D", chain), rule...)...)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		return string(out), err
+	}
+
+	return string(out), nil
+}
+
+// DeleteRuleRaw
+func DeleteRuleRawIPv4(table Table, rule ...string) (string, error) {
+	return deleteRuleRaw(iptablesCmdIPv4, table, rule...)
+}
+
+func DeleteRuleRawIPv6(table Table, rule ...string) (string, error) {
+	return deleteRuleRaw(iptablesCmdIPv6, table, rule...)
+}
+
+func deleteRuleRaw(iptablesCmd string, table Table, rule ...string) (string, error) {
+	// Lock
+	lock.Lock()
+	defer lock.Unlock()
+
+	// Set tables args
+	args := []string{"-t", string(table)}
+
+	// Check rule
+	cmd := exec.Command(iptablesCmd, append(append(args, "-C"), rule...)...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if strings.Contains(string(out), iptablesErrNoRule) {
+			// If rule isn't exist, return success
+			return string(out), nil
+		}
+		return string(out), err
+	}
+
+	// Delete rule
+	cmd = exec.Command(iptablesCmd, append(append(args, "-D"), rule...)...)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		return string(out), err
