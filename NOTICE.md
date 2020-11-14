@@ -1,4 +1,4 @@
-# OSS Notice | ipvs-node-controller #
+# OSS Notice | network-node-manager #
 
 This application is Copyright © Kakao Corp. All rights reserved.
 

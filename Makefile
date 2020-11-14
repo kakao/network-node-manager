@@ -9,15 +9,15 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-all: ipvs-node-controller
+all: network-node-manager
 
 # Run tests
 test: fmt vet
 	go test ./... -coverprofile cover.out
 
-# Build ipvs-node-controller binary
-ipvs-node-controller: fmt vet
-	go build -o bin/ipvs-node-controller main.go
+# Build network-node-manager binary
+network-node-manager: fmt vet
+	go build -o bin/network-node-manager main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: fmt vet

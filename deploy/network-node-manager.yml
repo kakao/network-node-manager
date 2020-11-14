@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: ipvs-node-controller-role
+  name: network-node-manager-role
 rules:
 - apiGroups:
   - ""
@@ -32,49 +32,49 @@ rules:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: ipvs-node-controller
+  name: network-node-manager
   namespace: kube-system
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: ipvs-node-controller-rolebinding
+  name: network-node-manager-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: ipvs-node-controller-role
+  name: network-node-manager-role
 subjects:
 - kind: ServiceAccount
-  name: ipvs-node-controller
+  name: network-node-manager
   namespace: kube-system
 
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: ipvs-node-controller
+  name: network-node-manager
   namespace: kube-system
   labels:
-    control-plane: ipvs-node-controller
+    control-plane: network-node-manager
 spec:
   selector:
     matchLabels:
-      control-plane: ipvs-node-controller
+      control-plane: network-node-manager
   template:
     metadata:
       labels:
-        control-plane: ipvs-node-controller
+        control-plane: network-node-manager
     spec:
-      serviceAccountName: ipvs-node-controller
+      serviceAccountName: network-node-manager
       hostNetwork: true
       containers:
       - command:
-        - /ipvs-node-controller
+        - /network-node-manager
         args:
         - --metrics-addr=0
-        image: kakaocorp/ipvs-node-controller:latest
-        name: ipvs-node-controller
+        image: kakaocorp/network-node-manager:latest
+        name: network-node-manager
         resources:
           limits:
             cpu: 100m

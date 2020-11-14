@@ -27,7 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/kakao/ipvs-node-controller/controllers"
+	"github.com/kakao/network-node-manager/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -54,7 +54,7 @@ func main() {
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		Port:               9443,
-		LeaderElection:     false, // ipvs-node-controller should not use leader election
+		LeaderElection:     false, // network-node-manager should not use leader election
 		LeaderElectionID:   "01a97da6.kakaocorp.com",
 	})
 	if err != nil {

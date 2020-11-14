@@ -1,4 +1,4 @@
-module github.com/kakao/ipvs-node-controller
+module github.com/kakao/network-node-manager
 
 go 1.13
 

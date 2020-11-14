@@ -30,9 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/go-logr/logr"
-	"github.com/kakao/ipvs-node-controller/pkg/configs"
-	"github.com/kakao/ipvs-node-controller/pkg/ip"
-	"github.com/kakao/ipvs-node-controller/pkg/iptables"
+	"github.com/kakao/network-node-manager/pkg/configs"
+	"github.com/kakao/network-node-manager/pkg/ip"
+	"github.com/kakao/network-node-manager/pkg/iptables"
 )
 
 // ServiceReconciler reconciles a Service object
@@ -47,8 +47,9 @@ const (
 	ChainNATPrerouting     = "PREROUTING"
 	ChainNATOutput         = "OUTPUT"
 	ChainNATKubeMasquerade = "KUBE-MARK-MASQ"
-	ChainNATIPVSPrerouting = "IPVS_PREROUTING"
-	ChainNATIPVSOutput     = "IPVS_OUTPUT"
+
+	ChainNATIPVSLBPrerouting = "NMANAGER_IPVS_LB_PREROUTING"
+	ChainNATIPVSLBOutput     = "NMANAGER_IPVS_LB_OUTPUT"
 )
 
 // Variables
@@ -196,12 +197,12 @@ func initIptables(logger logr.Logger) error {
 	if configIPv4Enabled {
 		// Create chain in nat table
 		logger.Info("create the IPVS IPv4 chains")
-		out, err := iptables.CreateChainIPv4(iptables.TableNAT, ChainNATIPVSPrerouting)
+		out, err := iptables.CreateChainIPv4(iptables.TableNAT, ChainNATIPVSLBPrerouting)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
-		out, err = iptables.CreateChainIPv4(iptables.TableNAT, ChainNATIPVSOutput)
+		out, err = iptables.CreateChainIPv4(iptables.TableNAT, ChainNATIPVSLBOutput)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -209,13 +210,13 @@ func initIptables(logger logr.Logger) error {
 
 		// Set jump rule to each chain in nat table
 		logger.Info("create jump rules for the IPVS IPv4 chains")
-		ruleJumpPre := []string{"-j", ChainNATIPVSPrerouting}
+		ruleJumpPre := []string{"-j", ChainNATIPVSLBPrerouting}
 		out, err = iptables.CreateRuleFirstIPv4(iptables.TableNAT, ChainNATPrerouting, "", ruleJumpPre...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
-		ruleJumpOut := []string{"-j", ChainNATIPVSOutput}
+		ruleJumpOut := []string{"-j", ChainNATIPVSLBOutput}
 		out, err = iptables.CreateRuleFirstIPv4(iptables.TableNAT, ChainNATOutput, "", ruleJumpOut...)
 		if err != nil {
 			logger.Error(err, out)
@@ -226,12 +227,12 @@ func initIptables(logger logr.Logger) error {
 	if configIPv6Enabled {
 		// Create chain in nat table
 		logger.Info("create the IPVS IPv6 chains")
-		out, err := iptables.CreateChainIPv6(iptables.TableNAT, ChainNATIPVSPrerouting)
+		out, err := iptables.CreateChainIPv6(iptables.TableNAT, ChainNATIPVSLBPrerouting)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
-		out, err = iptables.CreateChainIPv6(iptables.TableNAT, ChainNATIPVSOutput)
+		out, err = iptables.CreateChainIPv6(iptables.TableNAT, ChainNATIPVSLBOutput)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -239,13 +240,13 @@ func initIptables(logger logr.Logger) error {
 
 		// Set jump rule to each chain in nat table
 		logger.Info("create jump rules for the IPVS IPv6 chains")
-		ruleJumpPre := []string{"-j", ChainNATIPVSPrerouting}
+		ruleJumpPre := []string{"-j", ChainNATIPVSLBPrerouting}
 		out, err = iptables.CreateRuleFirstIPv6(iptables.TableNAT, ChainNATPrerouting, "", ruleJumpPre...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
-		ruleJumpOut := []string{"-j", ChainNATIPVSOutput}
+		ruleJumpOut := []string{"-j", ChainNATIPVSLBOutput}
 		out, err = iptables.CreateRuleFirstIPv6(iptables.TableNAT, ChainNATOutput, "", ruleJumpOut...)
 		if err != nil {
 			logger.Error(err, out)
@@ -270,7 +271,7 @@ func cleanupIptables(logger logr.Logger, svcs *corev1.ServiceList, podCIDRIPv4, 
 		}
 
 		// Cleanup prerouting chain
-		preRules, err := iptables.GetRulesIPv4(iptables.TableNAT, ChainNATIPVSPrerouting)
+		preRules, err := iptables.GetRulesIPv4(iptables.TableNAT, ChainNATIPVSLBPrerouting)
 		if err != nil {
 			return err
 		}
@@ -303,7 +304,7 @@ func cleanupIptables(logger logr.Logger, svcs *corev1.ServiceList, podCIDRIPv4, 
 		}
 
 		// Cleanup output chain
-		outRules, err := iptables.GetRulesIPv4(iptables.TableNAT, ChainNATIPVSOutput)
+		outRules, err := iptables.GetRulesIPv4(iptables.TableNAT, ChainNATIPVSLBOutput)
 		if err != nil {
 			return err
 		}
@@ -343,7 +344,7 @@ func cleanupIptables(logger logr.Logger, svcs *corev1.ServiceList, podCIDRIPv4, 
 		}
 
 		// Cleanup prerouting chain
-		preRules, err := iptables.GetRulesIPv6(iptables.TableNAT, ChainNATIPVSPrerouting)
+		preRules, err := iptables.GetRulesIPv6(iptables.TableNAT, ChainNATIPVSLBPrerouting)
 		if err != nil {
 			return err
 		}
@@ -376,7 +377,7 @@ func cleanupIptables(logger logr.Logger, svcs *corev1.ServiceList, podCIDRIPv4, 
 		}
 
 		// Cleanup output
-		outRules, err := iptables.GetRulesIPv6(iptables.TableNAT, ChainNATIPVSOutput)
+		outRules, err := iptables.GetRulesIPv6(iptables.TableNAT, ChainNATIPVSLBOutput)
 		if err != nil {
 			return err
 		}
@@ -413,13 +414,13 @@ func createIptablesRules(logger logr.Logger, req *ctrl.Request, clusterIP, exter
 		// IPv4
 		// Set prerouting
 		rulePreMasq := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", ChainNATKubeMasquerade}
-		out, err := iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
+		out, err := iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSLBPrerouting, req.String(), rulePreMasq...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		rulePreDNAT := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-		out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
+		out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSLBPrerouting, req.String(), rulePreDNAT...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -427,13 +428,13 @@ func createIptablesRules(logger logr.Logger, req *ctrl.Request, clusterIP, exter
 
 		// Set output
 		ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", ChainNATKubeMasquerade}
-		out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
+		out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSLBOutput, req.String(), ruleOutMasq...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-		out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
+		out, err = iptables.CreateRuleLastIPv4(iptables.TableNAT, ChainNATIPVSLBOutput, req.String(), ruleOutDNAT...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -442,13 +443,13 @@ func createIptablesRules(logger logr.Logger, req *ctrl.Request, clusterIP, exter
 		// IPv6
 		// Set prerouting
 		rulePreMasq := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", ChainNATKubeMasquerade}
-		out, err := iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
+		out, err := iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSLBPrerouting, req.String(), rulePreMasq...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		rulePreDNAT := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-		out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
+		out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSLBPrerouting, req.String(), rulePreDNAT...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -456,13 +457,13 @@ func createIptablesRules(logger logr.Logger, req *ctrl.Request, clusterIP, exter
 
 		// Set output
 		ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", ChainNATKubeMasquerade}
-		out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
+		out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSLBOutput, req.String(), ruleOutMasq...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-		out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
+		out, err = iptables.CreateRuleLastIPv6(iptables.TableNAT, ChainNATIPVSLBOutput, req.String(), ruleOutDNAT...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -483,13 +484,13 @@ func deleteIptablesRules(logger logr.Logger, req *ctrl.Request, clusterIP, exter
 		// IPv4
 		// Unset prerouting
 		rulePreMasq := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", ChainNATKubeMasquerade}
-		out, err := iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
+		out, err := iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSLBPrerouting, req.String(), rulePreMasq...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		rulePreDNAT := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-		out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
+		out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSLBPrerouting, req.String(), rulePreDNAT...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -497,13 +498,13 @@ func deleteIptablesRules(logger logr.Logger, req *ctrl.Request, clusterIP, exter
 
 		// Unset output
 		ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", ChainNATKubeMasquerade}
-		out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
+		out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSLBOutput, req.String(), ruleOutMasq...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-		out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
+		out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATIPVSLBOutput, req.String(), ruleOutDNAT...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -512,13 +513,13 @@ func deleteIptablesRules(logger logr.Logger, req *ctrl.Request, clusterIP, exter
 		// IPv6
 		// Unset prerouting
 		rulePreMasq := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", ChainNATKubeMasquerade}
-		out, err := iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreMasq...)
+		out, err := iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSLBPrerouting, req.String(), rulePreMasq...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		rulePreDNAT := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-		out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSPrerouting, req.String(), rulePreDNAT...)
+		out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSLBPrerouting, req.String(), rulePreDNAT...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -526,13 +527,13 @@ func deleteIptablesRules(logger logr.Logger, req *ctrl.Request, clusterIP, exter
 
 		// Unset output
 		ruleOutMasq := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", ChainNATKubeMasquerade}
-		out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutMasq...)
+		out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSLBOutput, req.String(), ruleOutMasq...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		ruleOutDNAT := []string{"-m", "addrtype", "--src-type", "LOCAL", "-d", externalIP, "-j", "DNAT", "--to-destination", clusterIP}
-		out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSOutput, req.String(), ruleOutDNAT...)
+		out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATIPVSLBOutput, req.String(), ruleOutDNAT...)
 		if err != nil {
 			logger.Error(err, out)
 			return err

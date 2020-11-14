@@ -18,7 +18,7 @@ jobs:
     - name: Prepare
       id: prepare
       run: |
-        DOCKER_IMAGE=kakaocorp/ipvs-node-controller
+        DOCKER_IMAGE=kakaocorp/network-node-manager
         DOCKER_PLATFORMS=linux/amd64,linux/arm64
         VERSION=latest
 
