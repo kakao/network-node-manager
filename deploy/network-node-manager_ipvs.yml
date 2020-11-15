@@ -1,0 +1,97 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: network-node-manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services/status
+  verbs:
+  - get
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: network-node-manager
+  namespace: kube-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: network-node-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: network-node-manager-role
+subjects:
+- kind: ServiceAccount
+  name: network-node-manager
+  namespace: kube-system
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: network-node-manager
+  namespace: kube-system
+  labels:
+    control-plane: network-node-manager
+spec:
+  selector:
+    matchLabels:
+      control-plane: network-node-manager
+  template:
+    metadata:
+      labels:
+        control-plane: network-node-manager
+    spec:
+      serviceAccountName: network-node-manager
+      hostNetwork: true
+      containers:
+      - command:
+        - /network-node-manager
+        args:
+        - --metrics-addr=0
+        image: kakaocorp/network-node-manager:latest
+        name: network-node-manager
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: RULE_EXTERNAL_CLUSTER
+          value: "true"
+        securityContext:
+          capabilities:
+            add: ["NET_ADMIN"]
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master

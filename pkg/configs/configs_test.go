@@ -62,3 +62,29 @@ func TestGetConfigNetStack(t *testing.T) {
 		t.Errorf("wrong result - %s", "ipv6,ipv4")
 	}
 }
+
+func TestGetConfigRuleExternalCluster(t *testing.T) {
+	os.Setenv(EnvRuleExternalCluster, "")
+	flag, _ := GetConfigRuleExternalCluster()
+	if flag {
+		t.Errorf("wrong result - %s", "")
+	}
+
+	os.Setenv(EnvRuleExternalCluster, "false")
+	flag, _ = GetConfigRuleExternalCluster()
+	if flag {
+		t.Errorf("wrong result - %s", "false")
+	}
+
+	os.Setenv(EnvRuleExternalCluster, "true")
+	flag, _ = GetConfigRuleExternalCluster()
+	if !flag {
+		t.Errorf("wrong result - %s", "true")
+	}
+
+	os.Setenv(EnvRuleExternalCluster, "none")
+	_, err := GetConfigRuleExternalCluster()
+	if err == nil {
+		t.Errorf("wrong result - %s", "none")
+	}
+}

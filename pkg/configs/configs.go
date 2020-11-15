@@ -7,11 +7,16 @@ import (
 )
 
 const (
-	EnvNodeName = "NODE_NAME"
+	EnvNodeName    = "NODE_NAME"
+	EnvConfigTrue  = "true"
+	EnvConfigFalse = "false"
 
 	EnvNetStack     = "NET_STACK"
 	EnvNetStackIPv4 = "ipv4"
 	EnvNetStackIPv6 = "ipv6"
+
+	EnvRuleExternalCluster  = "RULE_EXTERNAL_CLUSTER"
+	EnvRuleDropInvalidInput = "RULE_DROP_INVALID_INPUT"
 )
 
 func GetConfigNodeName() (string, error) {
@@ -41,8 +46,42 @@ func GetConfigNetStack() (bool, bool, error) {
 		} else if config == EnvNetStackIPv6 {
 			ipv6 = true
 		} else {
-			return false, false, fmt.Errorf("wrong network stack config : %s", config)
+			return false, false, fmt.Errorf("wrong config for network stack : %s", config)
 		}
 	}
 	return ipv4, ipv6, nil
+}
+
+func GetConfigRuleExternalCluster() (bool, error) {
+	// organize configs
+	config := os.Getenv(EnvRuleExternalCluster)
+	config = strings.ToLower(config)
+	if config == "" {
+		return false, nil
+	}
+
+	// return configs
+	if config == EnvConfigFalse {
+		return false, nil
+	} else if config == EnvConfigTrue {
+		return true, nil
+	}
+	return false, fmt.Errorf("wrong config for externalIP to clusterIP DNAT : %s", config)
+}
+
+func GetConfigRuleDropInvalidInput() (bool, error) {
+	// organize configs
+	config := os.Getenv(EnvRuleDropInvalidInput)
+	config = strings.ToLower(config)
+	if config == "" {
+		return true, nil
+	}
+
+	// return configs
+	if config == EnvConfigFalse {
+		return false, nil
+	} else if config == EnvConfigTrue {
+		return true, nil
+	}
+	return false, fmt.Errorf("wrong config for drop invalid packet in INPUT chain : %s", config)
 }

@@ -50,6 +50,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
+	// Initalize controller manager
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
@@ -62,6 +63,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize service controller
 	if err = (&controllers.ServiceReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("Service"),
@@ -72,6 +74,7 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
+	// Run service controller
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")

@@ -1,6 +1,9 @@
 # Network Node Manager
 
-network-node-manager is the kubernetes controller that solves External-IP (Load Balancer IP) issue with IPVS proxy mode. IPVS proxy mode has various problems, and one of them is that the External-IP assigned through the LoadBalancer type service with externalTrafficPolicy=Local option cannot access inside the cluster. More details on this issue can be found at [here](https://github.com/kubernetes/kubernetes/issues/75262). network-node-manager solves this issue. network-node-manager is based on [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder).
+network-node-manager is a kubernetes controller that controls the network configuration of a node to resolve network issues of kubernetes. By simply deploying and configuring network-node-manager, you can solve kubernetes network issues that cannot be resolved by kubernetes or resolved by the higher kubernetes Version. Below is a list of kubernetes's issues to be resolved by network-node-manager. network-node-manager is based on [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder).
+
+* [External-IP access issue with IPVS proxy mode](issues/external_IP_access_issue_IPVS_proxy_mode.md)
+* [Connection reset issue between pod and out of cluster](issues/connection_reset_issue_pod_out_cluster.md)
 
 ## Deploy
 
@@ -9,55 +12,56 @@ network-node-manager now supports below CPU architectures.
 * amd64
 * arm64
 
-Deploy network-node-managers through below command.
+Deploy network-node-managers through below command according to kube-proxy mode.
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/master/deploy/network-node-manager.yml
+iptables proxy mode : kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/master/deploy/network-node-manager_iptables.yml
+IPVS proxy mode     : kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/master/deploy/network-node-manager_ipvs.yml
 ```
 
 ## Configuration
 
-### IPv6
+### Network Stack (IPv4, IPv6)
 
-network-node-manager supports IPv6. However, IPv6 is not enabled by default. To use IPv6, set "NET_STACK" environment in the DaemonSet manifests of network-node-manager as follows.
+* Default : "ipv4"
+* iptables proxy mode manifest : "ipv4"
+* IPVS proxy mode manifest : "ipv4"
 
 ```
-...
-env:
-- name: NET_STACK
-  value: ipv4,ipv6
-- name: NODE_NAME
-  valueFrom:
-...
+IPv4      : kubectl -n kube-system set env daemonset/network-node-manager NET_STACK=ipv4
+IPv6      : kubectl -n kube-system set env daemonset/network-node-manager NET_STACK=ipv6
+IPv4,IPv6 : kubectl -n kube-system set env daemonset/network-node-manager NET_STACK=ipv4,ipv6
+```
+
+### External-IP to Cluster-IP DNAT Rule
+
+* Related issue : [External-IP access issue with IPVS proxy mode](issues/external_IP_access_issue_IPVS_proxy_mode.md)
+* Default : false
+* iptables proxy mode manifest : false
+* IPVS proxy mode manifest : true
+
+```
+On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER=true
+Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER=false
+```
+
+### Drop Invalid Packet Rule in INPUT chain
+
+* Related issue : [Connection reset issue between pod and out of cluster](issues/connection_reset_issue_pod_out_cluster.md)
+* Default : true
+* iptables proxy mode manifest : true
+* IPVS proxy mode manifest : true
+
+```
+On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_INVALID_INPUT=true
+Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_INVALID_INPUT=false
 ```
 
 ## How it works?
 
-network-node-manager works on all worker nodes and adds the DNAT rules that converts destination IP of a packet from External-IP to Cluster-IP to iptables. network-node-manager adds two DNAT rules for each LoadBalancer type service. One is added to the prerouting chain and the other is added to the output chain. The DNAT rule in the prerouting chain is for the pod that uses pod-only network namespace. On the other hand, The DNAT rule in the output chain is for the pod that uses host network namespace. All DNAT rules only target packets from pods on the host. Below is an example.
+![kpexec Architecture](img/network-node-manager_Architecture.PNG)
 
-```
-$ kubectl -n default get service 
-NAME           TYPE           CLUSTER-IP      EXTERNAL-IP    PORT(S)                      AGE
-lb-service-1   LoadBalancer   10.231.42.164   10.19.20.201   80:31751/TCP,443:30126/TCP   16d
-lb-service-2   LoadBalancer   10.231.2.62     10.19.22.57    80:32352/TCP,443:31549/TCP   16d
-
-$ iptables -nvL -t nat
-...
-Chain NMANAGER_IPVS_LB_OUTPUT (1 references)
- pkts bytes target     prot opt in     out     source               destination
-    0     0 KUBE-MARK-MASQ  all  --  *      *       0.0.0.0/0            10.19.20.201         /* default/lb-service-1 */ ADDRTYPE match src-type LOCAL
-    0     0 DNAT       all  --  *      *       0.0.0.0/0            10.19.20.201         /* default/lb-service-1 */ ADDRTYPE match src-type LOCAL to:10.231.42.164
-    2   120 KUBE-MARK-MASQ  all  --  *      *       0.0.0.0/0            10.19.22.57          /* default/lb-service-2 */ ADDRTYPE match src-type LOCAL
-    2   120 DNAT       all  --  *      *       0.0.0.0/0            10.19.22.57          /* default/lb-service-2 */ ADDRTYPE match src-type LOCAL to:10.231.2.62
-
-Chain NMANAGER_IPVS_LB_PREROUTING (1 references)
- pkts bytes target     prot opt in     out     source               destination
-    0     0 KUBE-MARK-MASQ  all  --  *      *       10.240.2.128/25      10.19.20.201         /* default/lb-service-1 */
-    0     0 DNAT       all  --  *      *       10.240.2.128/25      10.19.20.201         /* default/lb-service-1 */ to:10.231.42.164
-    1    60 KUBE-MARK-MASQ  all  --  *      *       10.240.2.128/25      10.19.22.57          /* default/lb-service-2 */
-    1    60 DNAT       all  --  *      *       10.240.2.128/25      10.19.22.57          /* default/lb-service-2 */ to:10.231.2.62
-...
-```
+network-node-manager runs on all kubernetes cluster nodes in host network namespace with network privileges and manage the node network configuration. network-node-manager watches the kubernetes object through kubenetes API server like a general kubernetes controller and manage the node network configuration. Now network-node-manager only watches service object.
 
 ## License
 

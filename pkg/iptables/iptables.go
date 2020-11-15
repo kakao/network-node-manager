@@ -16,7 +16,9 @@ const (
 	iptablesCmdIPv6     = "ip6tables"
 	iptablesSaveCmdIPv4 = "iptables-save"
 	iptablesSaveCmdIPv6 = "ip6tables-save"
+
 	iptablesErrNoRule   = "No chain/target/match by that name"
+	iptablesErrNoTarget = "Couldn't load target"
 
 	TableNAT    Table = "nat"
 	TableFilter Table = "filter"
@@ -111,6 +113,13 @@ func deleteChain(iptablesCmd string, table Table, chain string) (string, error) 
 	if err != nil {
 		// If chain isn't exist, return success
 		return string(out), nil
+	}
+
+	// Flush chain
+	cmd = exec.Command(iptablesCmd, append(args, "-F", chain)...)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		return string(out), err
 	}
 
 	// Delete chain
@@ -287,6 +296,9 @@ func deleteRule(iptablesCmd string, table Table, chain string, comment string, r
 	if err != nil {
 		if strings.Contains(string(out), iptablesErrNoRule) {
 			// If rule isn't exist, return success
+			return string(out), nil
+		} else if strings.Contains(string(out), iptablesErrNoTarget) {
+			// If target isn't exit, return success
 			return string(out), nil
 		}
 		return string(out), err
