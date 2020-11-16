@@ -12,7 +12,7 @@ ipvs-node-controller now supports below CPU architectures.
 Deploy ipvs-node-controllers through below command.
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/kakao/ipvs-node-controller/master/deploy/ipvs-node-controller.yml
+kubectl apply -f https://raw.githubusercontent.com/kakao/ipvs-node-controller/release-0.3/deploy/ipvs-node-controller.yml
 ```
 
 ## Configuration
