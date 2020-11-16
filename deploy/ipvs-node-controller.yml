@@ -73,7 +73,7 @@ spec:
         - /ipvs-node-controller
         args:
         - --metrics-addr=0
-        image: kakaocorp/ipvs-node-controller:latest
+        image: kakaocorp/ipvs-node-controller:v0.3
         name: ipvs-node-controller
         resources:
           limits:
