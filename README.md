@@ -15,8 +15,8 @@ network-node-manager now supports below CPU architectures.
 Deploy network-node-managers through below command according to kube-proxy mode.
 
 ```
-iptables proxy mode : kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/master/deploy/network-node-manager_iptables.yml
-IPVS proxy mode     : kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/master/deploy/network-node-manager_ipvs.yml
+iptables proxy mode : kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/release-1.0.0/deploy/network-node-manager_iptables.yml
+IPVS proxy mode     : kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/release-1.0.0/deploy/network-node-manager_ipvs.yml
 ```
 
 ## Configuration

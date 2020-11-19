@@ -73,7 +73,7 @@ spec:
         - /network-node-manager
         args:
         - --metrics-addr=0
-        image: kakaocorp/network-node-manager:latest
+        image: kakaocorp/network-node-manager:v1.0.0
         name: network-node-manager
         resources:
           limits:
