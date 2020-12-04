@@ -31,7 +31,7 @@ func createRulesDropInvalidInput(logger logr.Logger) error {
 
 		// Set jump rule
 		ruleJump := []string{"-j", ChainFilterDropInvalidInput}
-		out, err = iptables.CreateRuleFirstIPv4(iptables.TableFilter, ChainFilterBaseInput, "", ruleJump...)
+		out, err = iptables.CreateRuleFirstIPv4(iptables.TableFilter, ChainBaseInput, "", ruleJump...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -57,7 +57,7 @@ func createRulesDropInvalidInput(logger logr.Logger) error {
 
 		// Set jump rule
 		ruleJump := []string{"-j", ChainFilterDropInvalidInput}
-		out, err = iptables.CreateRuleFirstIPv6(iptables.TableFilter, ChainFilterBaseInput, "", ruleJump...)
+		out, err = iptables.CreateRuleFirstIPv6(iptables.TableFilter, ChainBaseInput, "", ruleJump...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -72,7 +72,7 @@ func deleteRulesDropInvalidInput(logger logr.Logger) error {
 	if configIPv4Enabled {
 		// Delete jump rule
 		ruleJump := []string{"-j", ChainFilterDropInvalidInput}
-		out, err := iptables.DeleteRuleIPv4(iptables.TableFilter, ChainFilterBaseInput, "", ruleJump...)
+		out, err := iptables.DeleteRuleIPv4(iptables.TableFilter, ChainBaseInput, "", ruleJump...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -90,7 +90,7 @@ func deleteRulesDropInvalidInput(logger logr.Logger) error {
 	if configIPv6Enabled {
 		// Delete jump rule
 		ruleJump := []string{"-j", ChainFilterDropInvalidInput}
-		out, err := iptables.DeleteRuleIPv6(iptables.TableFilter, ChainFilterBaseInput, "", ruleJump...)
+		out, err := iptables.DeleteRuleIPv6(iptables.TableFilter, ChainBaseInput, "", ruleJump...)
 		if err != nil {
 			logger.Error(err, out)
 			return err

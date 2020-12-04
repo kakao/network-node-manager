@@ -4,7 +4,7 @@ When using IPVS proxy mode, External-IP assigned through the LoadBalancer type s
 
 ## How to solve it
 
-network-node-manager adds two DNAT rules for each LoadBalancer type service. One is added to the prerouting chain and the other is added to the output chain. The DNAT rule in the prerouting chain is for the pod that uses pod-only network namespace. On the other hand, The DNAT rule in the output chain is for the pod that uses host network namespace. All DNAT rules only target packets from pods on the host. Below are example rules set by network-node-manager.
+network-node-manager adds the DNAT rules for each LoadBalancer type service. One is added to the prerouting chain and the other is added to the output chain. The DNAT rule in the prerouting chain is for the pod that uses pod-only network namespace. On the other hand, The DNAT rule in the output chain is for the pod that uses host network namespace. All DNAT rules only target packets from pods on the host. Below are example rules set by network-node-manager.
 
 ```
 $ kubectl -n default get service
@@ -12,7 +12,7 @@ NAME           TYPE           CLUSTER-IP      EXTERNAL-IP    PORT(S)            
 lb-service-1   LoadBalancer   10.231.42.164   10.19.20.201   80:31751/TCP,443:30126/TCP   16d
 lb-service-2   LoadBalancer   10.231.2.62     10.19.22.57    80:32352/TCP,443:31549/TCP   16d
 
-$ iptables -nvL -t nat
+$ iptables -t nat -nvL
 ...
 Chain PREROUTING (policy ACCEPT 0 packets, 0 bytes)
  pkts bytes target     prot opt in     out     source               destination

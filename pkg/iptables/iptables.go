@@ -22,6 +22,7 @@ const (
 
 	TableNAT    Table = "nat"
 	TableFilter Table = "filter"
+	TableRaw    Table = "raw"
 )
 
 // Var

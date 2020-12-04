@@ -1,13 +1,13 @@
 # Connection Reset Issue between Pod and Out of Cluster
 
-In general, when a container transmits a packet to outside the cluster, the packet is SNAT'ed. After that, when receiving a response packet from outside the container, the response packet must be DNAT'ed and delivered to the pod. However, due to the conntrack bug of the kernel, the response packet is regarded as an invliad packet, so there is a problem that the respose packet is not DNAT'ed and transmiited to the host. The host considers the response packet sent to the host as an incorrectly transmitted packet and disconnects the TCP connection by sending a reset packet.
+In general, when a container transmits a packet to outside the cluster, the packet is SNAT'ed. After that, when receiving a response packet from outside the container, the response packet must be DNAT'ed and delivered to the pod. However, due to the conntrack bug of the linux kernel, the response packet is regarded as an invliad packet, so there is a problem that the respose packet is not DNAT'ed and transmiited to the host. The host considers the response packet sent to the host as an incorrectly transmitted packet and disconnects the TCP connection by sending a reset packet.
 
 ## How to solve it
 
-network-node-manager adds DROP rule for invalid packet to INPUT chain in filter table. Below are rules set by network-node-manager.
+network-node-manager adds DROP the rules for invalid packet to INPUT chain in filter table. Below are rules set by network-node-manager.
 
 ```
-$ iptables -nvL -t filter
+$ iptables -t filter -nvL
 ...
 Chain INPUT (policy ACCEPT 3229 packets, 597K bytes)
  pkts bytes target     prot opt in     out     source               destination

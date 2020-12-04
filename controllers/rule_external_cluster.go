@@ -34,13 +34,13 @@ func initRulesExternalCluster(logger logr.Logger) error {
 
 		// Set jump rule to each chain in nat table
 		ruleJumpPre := []string{"-j", ChainNATExternalClusterPrerouting}
-		out, err = iptables.CreateRuleFirstIPv4(iptables.TableNAT, ChainNATBasePrerouting, "", ruleJumpPre...)
+		out, err = iptables.CreateRuleFirstIPv4(iptables.TableNAT, ChainBasePrerouting, "", ruleJumpPre...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		ruleJumpOut := []string{"-j", ChainNATExternalClusterOutput}
-		out, err = iptables.CreateRuleFirstIPv4(iptables.TableNAT, ChainNATBaseOutput, "", ruleJumpOut...)
+		out, err = iptables.CreateRuleFirstIPv4(iptables.TableNAT, ChainBaseOutput, "", ruleJumpOut...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -62,13 +62,13 @@ func initRulesExternalCluster(logger logr.Logger) error {
 
 		// Set jump rule to each chain in nat table
 		ruleJumpPre := []string{"-j", ChainNATExternalClusterPrerouting}
-		out, err = iptables.CreateRuleFirstIPv6(iptables.TableNAT, ChainNATBasePrerouting, "", ruleJumpPre...)
+		out, err = iptables.CreateRuleFirstIPv6(iptables.TableNAT, ChainBasePrerouting, "", ruleJumpPre...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		ruleJumpOut := []string{"-j", ChainNATExternalClusterOutput}
-		out, err = iptables.CreateRuleFirstIPv6(iptables.TableNAT, ChainNATBaseOutput, "", ruleJumpOut...)
+		out, err = iptables.CreateRuleFirstIPv6(iptables.TableNAT, ChainBaseOutput, "", ruleJumpOut...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -83,13 +83,13 @@ func destoryRulesExternalCluster(logger logr.Logger) error {
 	if configIPv4Enabled {
 		// Delete jump rule to each chain in nat table
 		ruleJumpPre := []string{"-j", ChainNATExternalClusterPrerouting}
-		out, err := iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATBasePrerouting, "", ruleJumpPre...)
+		out, err := iptables.DeleteRuleIPv4(iptables.TableNAT, ChainBasePrerouting, "", ruleJumpPre...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		ruleJumpOut := []string{"-j", ChainNATExternalClusterOutput}
-		out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainNATBaseOutput, "", ruleJumpOut...)
+		out, err = iptables.DeleteRuleIPv4(iptables.TableNAT, ChainBaseOutput, "", ruleJumpOut...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -111,13 +111,13 @@ func destoryRulesExternalCluster(logger logr.Logger) error {
 	if configIPv6Enabled {
 		// Delete jump rule to each chain in nat table
 		ruleJumpPre := []string{"-j", ChainNATExternalClusterPrerouting}
-		out, err := iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATBasePrerouting, "", ruleJumpPre...)
+		out, err := iptables.DeleteRuleIPv6(iptables.TableNAT, ChainBasePrerouting, "", ruleJumpPre...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
 		ruleJumpOut := []string{"-j", ChainNATExternalClusterOutput}
-		out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainNATBaseOutput, "", ruleJumpOut...)
+		out, err = iptables.DeleteRuleIPv6(iptables.TableNAT, ChainBaseOutput, "", ruleJumpOut...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
