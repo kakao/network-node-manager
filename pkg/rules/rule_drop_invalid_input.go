@@ -1,4 +1,4 @@
-package controllers
+package rules
 
 import (
 	"github.com/go-logr/logr"
@@ -6,7 +6,8 @@ import (
 	"github.com/kakao/network-node-manager/pkg/iptables"
 )
 
-func createRulesDropInvalidInput(logger logr.Logger) error {
+func CreateRulesDropInvalidInput(logger logr.Logger) error {
+	// Init base chains
 	if err := initBaseChains(logger); err != nil {
 		logger.Error(err, "failed to init base chain for externalIP to clusterIP Rules")
 		return err
@@ -67,7 +68,7 @@ func createRulesDropInvalidInput(logger logr.Logger) error {
 	return nil
 }
 
-func deleteRulesDropInvalidInput(logger logr.Logger) error {
+func DeleteRulesDropInvalidInput(logger logr.Logger) error {
 	// IPv4
 	if configIPv4Enabled {
 		// Delete jump rule

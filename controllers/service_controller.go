@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"os"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +31,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/kakao/network-node-manager/pkg/configs"
+	"github.com/kakao/network-node-manager/pkg/ip"
+	"github.com/kakao/network-node-manager/pkg/rules"
 )
 
 // ServiceReconciler reconciles a Service object
@@ -64,7 +67,7 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithName("reconcile").WithValues("service", req.NamespacedName)
 	var err error
 
-	// Init service controller
+	// ** Init service controller **
 	// In SetupWithManager, function k8s client cannot be used.
 	// So initialize controller in Reconile() function.
 	if !initFlag {
@@ -109,25 +112,28 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		logger.WithValues("flag", configRuleDropInvalidInput).Info("config rule drop invalid packet in INPUT chain")
 		logger.WithValues("flag", configRuleExternalCluster).Info("config rule externalIP to clusterIP")
 
+		// Init packages
+		rules.Init(configIPv4Enabled, configIPv6Enabled)
+
 		// Run rules first
 		if configRuleNotTrackDNS {
-			if err := createRulesNotTrackDNS(logger); err != nil {
+			if err := rules.CreateRulesNotTrackDNS(logger); err != nil {
 				logger.Error(err, "failed to create rule not tracking DNS packet")
 				os.Exit(1)
 			}
 		} else {
-			if err := deleteRulesNotTrackDNS(logger); err != nil {
+			if err := rules.DeleteRulesNotTrackDNS(logger); err != nil {
 				logger.Error(err, "failed to delete rule not trackring DNS packet")
 				os.Exit(1)
 			}
 		}
 		if configRuleDropInvalidInput {
-			if err := createRulesDropInvalidInput(logger); err != nil {
+			if err := rules.CreateRulesDropInvalidInput(logger); err != nil {
 				logger.Error(err, "failed to create rule drop invalid packet in INPUT chain")
 				os.Exit(1)
 			}
 		} else {
-			if err := deleteRulesDropInvalidInput(logger); err != nil {
+			if err := rules.DeleteRulesDropInvalidInput(logger); err != nil {
 				logger.Error(err, "failed to delete rule drop invalid packet in INPUT chain")
 				os.Exit(1)
 			}
@@ -140,12 +146,12 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				<-ticker.C
 
 				if configRuleNotTrackDNS {
-					if err := createRulesNotTrackDNS(logger); err != nil {
+					if err := rules.CreateRulesNotTrackDNS(logger); err != nil {
 						logger.Error(err, "failed to create rule not tracking DNS packet")
 					}
 				}
 				if configRuleDropInvalidInput {
-					if err := createRulesDropInvalidInput(logger); err != nil {
+					if err := rules.CreateRulesDropInvalidInput(logger); err != nil {
 						logger.Error(err, "failed to create rule drop invalid packet in INPUT chain")
 					}
 				}
@@ -163,7 +169,7 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			logger.WithValues("pod CIDR IPV4", podCIDRIPv4).WithValues("pod CIDR IPv6", podCIDRIPv6).Info("pod CIDR")
 
 			// Initialize externalIP to clusterIP rules
-			if err := initRulesExternalCluster(logger); err != nil {
+			if err := rules.InitRulesExternalCluster(logger); err != nil {
 				logger.Error(err, "failed to initalize rule externalIP to clusterIP")
 				os.Exit(1)
 			}
@@ -176,23 +182,23 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			}
 
 			// Cleanup externalIP to clusterIP rules for deleted services
-			if err := cleanupRulesExternalCluster(logger, svcs, podCIDRIPv4, podCIDRIPv6); err != nil {
+			if err := rules.CleanupRulesExternalCluster(logger, svcs, podCIDRIPv4, podCIDRIPv6); err != nil {
 				logger.Error(err, "failed to cleanup rule externalIP to clusterIP")
 				os.Exit(1)
 			}
 		} else {
 			// Destroy externalIP to clusterIP rules
-			if err := destoryRulesExternalCluster(logger); err != nil {
+			if err := rules.DestoryRulesExternalCluster(logger); err != nil {
 				logger.Error(err, "failed to destroy rule externalIP to clusterIP")
 				os.Exit(1)
 			}
 		}
 	}
 
-	// Loop
+	// ** Reconcile Loop **
 	if configRuleExternalCluster {
 		// In case the iptables chain is deleted, initalize again
-		if err := initRulesExternalCluster(logger); err != nil {
+		if err := rules.InitRulesExternalCluster(logger); err != nil {
 			logger.Error(err, "failed to initalize rule externalIP to clusterIP")
 			os.Exit(1)
 		}
@@ -218,7 +224,7 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 					// Delete rules
 					logger.WithValues("externalIP", oldExternalIP).WithValues("clusterIP", oldClusterIP).Info("delete rule externalIp to clusterIP")
-					if err := deleteRulesExternalCluster(logger, &req, oldClusterIP, oldExternalIP, podCIDRIPv4, podCIDRIPv6); err != nil {
+					if err := rules.DeleteRulesExternalCluster(logger, &req, oldClusterIP, oldExternalIP, podCIDRIPv4, podCIDRIPv6); err != nil {
 						return ctrl.Result{}, err
 					}
 				}
@@ -244,7 +250,7 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 			// Create rules
 			logger.WithValues("externalIP", externalIP).WithValues("clusterIP", clusterIP).Info("create iptables rules")
-			if err := createRulesExternalCluster(logger, &req, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6); err != nil {
+			if err := rules.CreateRulesExternalCluster(logger, &req, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -258,4 +264,16 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
 		Complete(r)
+}
+
+func getPodCIDR(cidrs []string) (ipv4CIDR string, ipv6CIDR string) {
+	for _, cidr := range cidrs {
+		addr := strings.Split(cidr, "/")[0]
+		if ip.IsIPv4Addr(addr) {
+			ipv4CIDR = cidr
+		} else if ip.IsIPv6Addr(addr) {
+			ipv6CIDR = cidr
+		}
+	}
+	return
 }

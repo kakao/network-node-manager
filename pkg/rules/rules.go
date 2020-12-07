@@ -1,9 +1,8 @@
-package controllers
+package rules
 
 import (
 	"github.com/go-logr/logr"
 
-	"github.com/kakao/network-node-manager/pkg/configs"
 	"github.com/kakao/network-node-manager/pkg/iptables"
 )
 
@@ -26,13 +25,18 @@ const (
 	ChainNATKubeMarkMasq = "KUBE-MARK-MASQ"
 )
 
-func initBaseChains(logger logr.Logger) error {
-	// Get network stack config
-	configIPv4Enabled, configIPv6Enabled, err := configs.GetConfigNetStack()
-	if err != nil {
-		return err
-	}
+// Vars
+var (
+	configIPv4Enabled bool
+	configIPv6Enabled bool
+)
 
+func Init(configIPv4, configIPv6 bool) {
+	configIPv4Enabled = configIPv4
+	configIPv6Enabled = configIPv6
+}
+
+func initBaseChains(logger logr.Logger) error {
 	// IPv4
 	if configIPv4Enabled {
 		// Create base chain in tables

@@ -1,8 +1,7 @@
-package controllers
+package rules
 
 import (
 	"errors"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -12,7 +11,8 @@ import (
 	"github.com/kakao/network-node-manager/pkg/iptables"
 )
 
-func initRulesExternalCluster(logger logr.Logger) error {
+func InitRulesExternalCluster(logger logr.Logger) error {
+	// Init base chains
 	if err := initBaseChains(logger); err != nil {
 		logger.Error(err, "failed to init base chain for externalIP to clusterIP Rules")
 		return err
@@ -78,7 +78,7 @@ func initRulesExternalCluster(logger logr.Logger) error {
 	return nil
 }
 
-func destoryRulesExternalCluster(logger logr.Logger) error {
+func DestoryRulesExternalCluster(logger logr.Logger) error {
 	// IPv4
 	if configIPv4Enabled {
 		// Delete jump rule to each chain in nat table
@@ -139,7 +139,7 @@ func destoryRulesExternalCluster(logger logr.Logger) error {
 	return nil
 }
 
-func cleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList, podCIDRIPv4, podCIDRIPv6 string) error {
+func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList, podCIDRIPv4, podCIDRIPv6 string) error {
 	// IPv4
 	if configIPv4Enabled {
 		// Make up service map
@@ -304,7 +304,7 @@ func cleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList, p
 	return nil
 }
 
-func createRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6 string) error {
+func CreateRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6 string) error {
 	// Don't use spec.ipFamily to distingush between IPv4 and IPv6 Address
 	// for kubernetes version that dosen't support IPv6 dualstack
 	if configIPv4Enabled && ip.IsIPv4Addr(clusterIP) {
@@ -374,7 +374,7 @@ func createRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP
 	return nil
 }
 
-func deleteRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6 string) error {
+func DeleteRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6 string) error {
 	// Don't use spec.ipFamily to distingush between IPv4 and IPv6 Address
 	// for kubernetes version that dosen't support IPv6 dualstack
 	if configIPv4Enabled && ip.IsIPv4Addr(clusterIP) {
@@ -441,18 +441,6 @@ func deleteRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP
 		}
 	}
 	return nil
-}
-
-func getPodCIDR(cidrs []string) (ipv4CIDR string, ipv6CIDR string) {
-	for _, cidr := range cidrs {
-		addr := strings.Split(cidr, "/")[0]
-		if ip.IsIPv4Addr(addr) {
-			ipv4CIDR = cidr
-		} else if ip.IsIPv6Addr(addr) {
-			ipv6CIDR = cidr
-		}
-	}
-	return
 }
 
 func getSvcInfoFromRule(rule string) (nsName, src, dest, jump, dnatDest string) {
