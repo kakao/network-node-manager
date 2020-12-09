@@ -2,9 +2,9 @@
 
 network-node-manager is a kubernetes controller that controls the network configuration of a node to resolve network issues of kubernetes. By simply deploying and configuring network-node-manager, you can solve kubernetes network issues that cannot be resolved by kubernetes or resolved by the higher kubernetes Version. Below is a list of kubernetes's issues to be resolved by network-node-manager. network-node-manager is based on [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder).
 
-* [DNS packet dropped issue](issues/DNS_packet_dropped_issue.md)
 * [Connection reset issue between pod and out of cluster](issues/connection_reset_issue_pod_out_cluster.md)
 * [External-IP access issue with IPVS proxy mode](issues/external_IP_access_issue_IPVS_proxy_mode.md)
+* [DNS packet dropped issue](issues/DNS_packet_dropped_issue.md) (Experimental)
 
 ## Deploy
 
@@ -33,17 +33,6 @@ IPv4      : kubectl -n kube-system set env daemonset/network-node-manager NET_ST
 IPv6      : kubectl -n kube-system set env daemonset/network-node-manager NET_STACK=ipv6
 IPv4,IPv6 : kubectl -n kube-system set env daemonset/network-node-manager NET_STACK=ipv4,ipv6
 ```
-### Not Track DNS Packet Rule
-
-* Related issue : [DNS packet dropped issue](issues/DNS_packet_dropped_issue.md)   
-* Default : true
-* iptables proxy mode manifest : true
-* IPVS proxy mode manifest : true
-
-```
-On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS=true
-Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS=false
-```
 
 ### Drop Invalid Packet Rule in INPUT chain
 
@@ -67,6 +56,18 @@ Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_IN
 ```
 On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER=true
 Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER=false
+```
+
+### Not Track DNS Packet Rule (Experimental)
+
+* Related issue : [DNS packet dropped issue](issues/DNS_packet_dropped_issue.md)   
+* Default : false
+* iptables proxy mode manifest : false
+* IPVS proxy mode manifest : false
+
+```
+On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS=true
+Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS=false
 ```
 
 ## How it works?

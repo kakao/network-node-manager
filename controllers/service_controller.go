@@ -48,9 +48,9 @@ var (
 	configIPv4Enabled bool
 	configIPv6Enabled bool
 
-	configRuleNotTrackDNS      bool
 	configRuleDropInvalidInput bool
 	configRuleExternalCluster  bool
+	configRuleNotTrackDNS      bool
 
 	initFlag    = false
 	podCIDRIPv4 string
@@ -93,11 +93,6 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		logger.WithValues("node name", configNodeName).Info("config node name")
 		logger.WithValues("IPv4", configIPv4Enabled).WithValues("IPv6", configIPv6Enabled).Info("config network stack")
 
-		configRuleNotTrackDNS, err = configs.GetConfigRuleNotTrackDNS()
-		if err != nil {
-			logger.Error(err, "config error")
-			os.Exit(1)
-		}
 		configRuleDropInvalidInput, err = configs.GetConfigRuleDropInvalidInput()
 		if err != nil {
 			logger.Error(err, "config error")
@@ -108,25 +103,19 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			logger.Error(err, "config error")
 			os.Exit(1)
 		}
-		logger.WithValues("flag", configRuleNotTrackDNS).Info("config rule not tracking DNS packet")
+		configRuleNotTrackDNS, err = configs.GetConfigRuleNotTrackDNS()
+		if err != nil {
+			logger.Error(err, "config error")
+			os.Exit(1)
+		}
 		logger.WithValues("flag", configRuleDropInvalidInput).Info("config rule drop invalid packet in INPUT chain")
 		logger.WithValues("flag", configRuleExternalCluster).Info("config rule externalIP to clusterIP")
+		logger.WithValues("flag", configRuleNotTrackDNS).Info("config rule not tracking DNS packet")
 
 		// Init packages
 		rules.Init(configIPv4Enabled, configIPv6Enabled)
 
 		// Run rules first
-		if configRuleNotTrackDNS {
-			if err := rules.CreateRulesNotTrackDNS(logger); err != nil {
-				logger.Error(err, "failed to create rule not tracking DNS packet")
-				os.Exit(1)
-			}
-		} else {
-			if err := rules.DeleteRulesNotTrackDNS(logger); err != nil {
-				logger.Error(err, "failed to delete rule not trackring DNS packet")
-				os.Exit(1)
-			}
-		}
 		if configRuleDropInvalidInput {
 			if err := rules.CreateRulesDropInvalidInput(logger); err != nil {
 				logger.Error(err, "failed to create rule drop invalid packet in INPUT chain")
@@ -138,6 +127,17 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				os.Exit(1)
 			}
 		}
+		if configRuleNotTrackDNS {
+			if err := rules.CreateRulesNotTrackDNS(logger); err != nil {
+				logger.Error(err, "failed to create rule not tracking DNS packet")
+				os.Exit(1)
+			}
+		} else {
+			if err := rules.DeleteRulesNotTrackDNS(logger); err != nil {
+				logger.Error(err, "failed to delete rule not trackring DNS packet")
+				os.Exit(1)
+			}
+		}
 
 		// Run rules periodically
 		ticker := time.NewTicker(60 * time.Second)
@@ -145,14 +145,14 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			for {
 				<-ticker.C
 
-				if configRuleNotTrackDNS {
-					if err := rules.CreateRulesNotTrackDNS(logger); err != nil {
-						logger.Error(err, "failed to create rule not tracking DNS packet")
-					}
-				}
 				if configRuleDropInvalidInput {
 					if err := rules.CreateRulesDropInvalidInput(logger); err != nil {
 						logger.Error(err, "failed to create rule drop invalid packet in INPUT chain")
+					}
+				}
+				if configRuleNotTrackDNS {
+					if err := rules.CreateRulesNotTrackDNS(logger); err != nil {
+						logger.Error(err, "failed to create rule not tracking DNS packet")
 					}
 				}
 			}

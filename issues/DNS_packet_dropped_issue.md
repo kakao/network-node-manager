@@ -2,6 +2,10 @@
 
 There is an issue in which some DNS packets are dropped due to the race condition of linux kernel conntrack. Because of this issue, a phenomenon in which Record Resolve of Service or Pod within Kubernetes Cluster often fails occurs.
 
+## Caution and Preparation
+
+Currently, this solution is in **experimental** stage. This solution only works in environments where systemd-resolved dose not run in kubernetes cluster nodes. **This is because CoreDNS must be run in the host network namespace.** Before applying this solution, configure CoreDNS to run in the host network namespace. 
+
 ## How to solve it
 
 network-node-manager adds the not tracking rules for DNS packet to avoid the race condition of linux kernel conntrack. Below are rules set by network-node-manager. 

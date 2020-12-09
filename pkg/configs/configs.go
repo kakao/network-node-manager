@@ -53,23 +53,6 @@ func GetConfigNetStack() (bool, bool, error) {
 	return ipv4, ipv6, nil
 }
 
-func GetConfigRuleNotTrackDNS() (bool, error) {
-	// organize configs
-	config := os.Getenv(EnvRuleDropNotTrackDNS)
-	config = strings.ToLower(config)
-	if config == "" {
-		return true, nil
-	}
-
-	// return configs
-	if config == EnvConfigFalse {
-		return false, nil
-	} else if config == EnvConfigTrue {
-		return true, nil
-	}
-	return false, fmt.Errorf("wrong config for not tracking DNS packet : %s", config)
-}
-
 func GetConfigRuleDropInvalidInput() (bool, error) {
 	// organize configs
 	config := os.Getenv(EnvRuleDropInvalidInput)
@@ -102,4 +85,21 @@ func GetConfigRuleExternalCluster() (bool, error) {
 		return true, nil
 	}
 	return false, fmt.Errorf("wrong config for externalIP to clusterIP DNAT : %s", config)
+}
+
+func GetConfigRuleNotTrackDNS() (bool, error) {
+	// organize configs
+	config := os.Getenv(EnvRuleDropNotTrackDNS)
+	config = strings.ToLower(config)
+	if config == "" {
+		return false, nil
+	}
+
+	// return configs
+	if config == EnvConfigFalse {
+		return false, nil
+	} else if config == EnvConfigTrue {
+		return true, nil
+	}
+	return false, fmt.Errorf("wrong config for not tracking DNS packet : %s", config)
 }

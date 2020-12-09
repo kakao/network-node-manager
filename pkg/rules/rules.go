@@ -16,11 +16,11 @@ const (
 	ChainBaseInput      = "NMANAGER_INPUT"
 	ChainBaseOutput     = "NMANAGER_OUTPUT"
 
-	ChainRawNotTrackDNSPrerouting     = "NMANAGER_NOT_DNS_PREROUTING"
-	ChainRawNotTrackDNSOutput         = "NMANAGER_NOT_DNS_OUTPUT"
 	ChainFilterDropInvalidInput       = "NMANAGER_DROP_INVALID_INPUT"
 	ChainNATExternalClusterPrerouting = "NMANAGER_EX_CLUS_PREROUTING"
 	ChainNATExternalClusterOutput     = "NMANAGER_EX_CLUS_OUTPUT"
+	ChainRawNotTrackDNSPrerouting     = "NMANAGER_NOT_DNS_PREROUTING"
+	ChainRawNotTrackDNSOutput         = "NMANAGER_NOT_DNS_OUTPUT"
 
 	ChainNATKubeMarkMasq = "KUBE-MARK-MASQ"
 )
