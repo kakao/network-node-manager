@@ -3,10 +3,11 @@ package rules
 import (
 	"github.com/go-logr/logr"
 
+	"github.com/kakao/network-node-manager/pkg/ip"
 	"github.com/kakao/network-node-manager/pkg/iptables"
 )
 
-func CreateRulesNotTrackDNS(logger logr.Logger) error {
+func InitRulesNotTrackDNS(logger logr.Logger, podCIDRIPv4, podCIDRIPv6 string) error {
 	// Init base chains
 	if err := initBaseChains(logger); err != nil {
 		logger.Error(err, "failed to init base chain for externalIP to clusterIP Rules")
@@ -28,24 +29,24 @@ func CreateRulesNotTrackDNS(logger logr.Logger) error {
 		}
 
 		// Set not track rules
-		ruleNotTrackSport := []string{"-p", "UDP", "-m", "udp", "--sport", "53", "-j", "CT", "--notrack"}
-		out, err = iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainRawNotTrackDNSPrerouting, "", ruleNotTrackSport...)
+		ruleNotTrackSrcPodCidr := []string{"-p", "UDP", "-m", "udp", "-s", podCIDRIPv4, "--sport", "53", "-j", "CT", "--notrack"}
+		out, err = iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainRawNotTrackDNSPrerouting, "", ruleNotTrackSrcPodCidr...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
-		out, err = iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainRawNotTrackDNSOutput, "", ruleNotTrackSport...)
+		out, err = iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainRawNotTrackDNSOutput, "", ruleNotTrackSrcPodCidr...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
-		ruleNotTrackDport := []string{"-p", "UDP", "-m", "udp", "--dport", "53", "-j", "CT", "--notrack"}
-		out, err = iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainRawNotTrackDNSPrerouting, "", ruleNotTrackDport...)
+		ruleNotTrackDestPodCidr := []string{"-p", "UDP", "-m", "udp", "-d", podCIDRIPv4, "--dport", "53", "-j", "CT", "--notrack"}
+		out, err = iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainRawNotTrackDNSPrerouting, "", ruleNotTrackDestPodCidr...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
-		out, err = iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainRawNotTrackDNSOutput, "", ruleNotTrackDport...)
+		out, err = iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainRawNotTrackDNSOutput, "", ruleNotTrackDestPodCidr...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -81,24 +82,24 @@ func CreateRulesNotTrackDNS(logger logr.Logger) error {
 		}
 
 		// Set not track rules
-		ruleNotTrackSport := []string{"-p", "UDP", "-m", "udp", "--sport", "53", "-j", "CT", "--notrack"}
-		out, err = iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainRawNotTrackDNSPrerouting, "", ruleNotTrackSport...)
+		ruleNotTrackSrcPodCidr := []string{"-p", "UDP", "-m", "udp", "-s", podCIDRIPv6, "--sport", "53", "-j", "CT", "--notrack"}
+		out, err = iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainRawNotTrackDNSPrerouting, "", ruleNotTrackSrcPodCidr...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
-		out, err = iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainRawNotTrackDNSOutput, "", ruleNotTrackSport...)
+		out, err = iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainRawNotTrackDNSOutput, "", ruleNotTrackSrcPodCidr...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
-		ruleNotTrackDport := []string{"-p", "UDP", "-m", "udp", "--dport", "53", "-j", "CT", "--notrack"}
-		out, err = iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainRawNotTrackDNSPrerouting, "", ruleNotTrackDport...)
+		ruleNotTrackDestPodCidr := []string{"-p", "UDP", "-m", "udp", "-d", podCIDRIPv6, "--dport", "53", "-j", "CT", "--notrack"}
+		out, err = iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainRawNotTrackDNSPrerouting, "", ruleNotTrackDestPodCidr...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
 		}
-		out, err = iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainRawNotTrackDNSOutput, "", ruleNotTrackDport...)
+		out, err = iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainRawNotTrackDNSOutput, "", ruleNotTrackDestPodCidr...)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -122,7 +123,7 @@ func CreateRulesNotTrackDNS(logger logr.Logger) error {
 	return nil
 }
 
-func DeleteRulesNotTrackDNS(logger logr.Logger) error {
+func CleanupRulesNotTrackDNS(logger logr.Logger) error {
 	// IPv4
 	if configIPv4Enabled {
 		// Delete jump rule
@@ -175,6 +176,48 @@ func DeleteRulesNotTrackDNS(logger logr.Logger) error {
 			return err
 		}
 		out, err = iptables.DeleteChainIPv6(iptables.TableRaw, ChainRawNotTrackDNSOutput)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func CreateRulesNotTrackDNS(logger logr.Logger, dnsClusterIP string) error {
+	// Init base chains
+	if err := initBaseChains(logger); err != nil {
+		logger.Error(err, "failed to init base chain for externalIP to clusterIP Rules")
+		return err
+	}
+
+	// IPv4
+	if configIPv4Enabled && ip.IsIPv4Addr(dnsClusterIP) {
+		// Set not track rules
+		ruleNotTrackDport := []string{"-p", "UDP", "-m", "udp", "-d", dnsClusterIP, "--dport", "53", "-j", "CT", "--notrack"}
+		out, err := iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainRawNotTrackDNSPrerouting, "", ruleNotTrackDport...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+		out, err = iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainRawNotTrackDNSOutput, "", ruleNotTrackDport...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+	}
+
+	// IPv6
+	if configIPv6Enabled && ip.IsIPv6Addr(dnsClusterIP) {
+		// Set not track rules
+		ruleNotTrackDport := []string{"-p", "UDP", "-m", "udp", "-d", dnsClusterIP, "--dport", "53", "-j", "CT", "--notrack"}
+		out, err := iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainRawNotTrackDNSPrerouting, "", ruleNotTrackDport...)
+		if err != nil {
+			logger.Error(err, out)
+			return err
+		}
+		out, err = iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainRawNotTrackDNSOutput, "", ruleNotTrackDport...)
 		if err != nil {
 			logger.Error(err, out)
 			return err

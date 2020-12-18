@@ -64,26 +64,26 @@ func TestGetConfigNetStack(t *testing.T) {
 }
 
 func TestGetConfigRuleExternalCluster(t *testing.T) {
-	os.Setenv(EnvRuleExternalCluster, "")
-	flag, _ := GetConfigRuleExternalCluster()
+	os.Setenv(EnvRuleExternalClusterEnable, "")
+	flag, _ := GetConfigRuleExternalClusterEnabled()
 	if flag {
 		t.Errorf("wrong result - %s", "")
 	}
 
-	os.Setenv(EnvRuleExternalCluster, "false")
-	flag, _ = GetConfigRuleExternalCluster()
+	os.Setenv(EnvRuleExternalClusterEnable, "false")
+	flag, _ = GetConfigRuleExternalClusterEnabled()
 	if flag {
 		t.Errorf("wrong result - %s", "false")
 	}
 
-	os.Setenv(EnvRuleExternalCluster, "true")
-	flag, _ = GetConfigRuleExternalCluster()
+	os.Setenv(EnvRuleExternalClusterEnable, "true")
+	flag, _ = GetConfigRuleExternalClusterEnabled()
 	if !flag {
 		t.Errorf("wrong result - %s", "true")
 	}
 
-	os.Setenv(EnvRuleExternalCluster, "none")
-	_, err := GetConfigRuleExternalCluster()
+	os.Setenv(EnvRuleExternalClusterEnable, "none")
+	_, err := GetConfigRuleExternalClusterEnabled()
 	if err == nil {
 		t.Errorf("wrong result - %s", "none")
 	}

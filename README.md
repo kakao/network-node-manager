@@ -4,7 +4,7 @@ network-node-manager is a kubernetes controller that controls the network config
 
 * [Connection reset issue between pod and out of cluster](issues/connection_reset_issue_pod_out_cluster.md)
 * [External-IP access issue with IPVS proxy mode](issues/external_IP_access_issue_IPVS_proxy_mode.md)
-* [DNS packet dropped issue](issues/DNS_packet_dropped_issue.md) (Experimental)
+* [DNS packet dropped issue](issues/DNS_packet_dropped_issue.md) 
 
 ## Deploy
 
@@ -22,7 +22,7 @@ IPVS proxy mode     : kubectl apply -f https://raw.githubusercontent.com/kakao/n
 
 ## Configuration
 
-### Network Stack (IPv4, IPv6)
+### Set Network Stack (IPv4, IPv6)
 
 * Default : "ipv4"
 * iptables proxy mode manifest : "ipv4"
@@ -34,7 +34,7 @@ IPv6      : kubectl -n kube-system set env daemonset/network-node-manager NET_ST
 IPv4,IPv6 : kubectl -n kube-system set env daemonset/network-node-manager NET_STACK=ipv4,ipv6
 ```
 
-### Drop Invalid Packet Rule in INPUT chain
+### Enable Drop Invalid Packet Rule in INPUT chain
 
 * Related issue : [Connection reset issue between pod and out of cluster](issues/connection_reset_issue_pod_out_cluster.md)
 * Default : true
@@ -42,11 +42,11 @@ IPv4,IPv6 : kubectl -n kube-system set env daemonset/network-node-manager NET_ST
 * IPVS proxy mode manifest : true
 
 ```
-On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_INVALID_INPUT=true
-Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_INVALID_INPUT=false
+On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_INVALID_INPUT_ENABLE=true
+Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_INVALID_INPUT_ENABLE=false
 ```
 
-### External-IP to Cluster-IP DNAT Rule
+### Enable External-IP to Cluster-IP DNAT Rule
 
 * Related issue : [External-IP access issue with IPVS proxy mode](issues/external_IP_access_issue_IPVS_proxy_mode.md)
 * Default : false
@@ -54,11 +54,11 @@ Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_IN
 * IPVS proxy mode manifest : true
 
 ```
-On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER=true
-Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER=false
+On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER_ENABLE=true
+Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER_ENABLE=false
 ```
 
-### Not Track DNS Packet Rule (Experimental)
+### Enable Not Track DNS Packet Rule
 
 * Related issue : [DNS packet dropped issue](issues/DNS_packet_dropped_issue.md)   
 * Default : false
@@ -66,8 +66,19 @@ Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNA
 * IPVS proxy mode manifest : false
 
 ```
-On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS=true
-Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS=false
+On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE=true
+Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE=false
+```
+
+### Set Kubernetes DNS Service Names for Not Track DNS Packet Rule
+
+* Related issue : [DNS packet dropped issue](issues/DNS_packet_dropped_issue.md)   
+* Default : "kube-dns"
+* Support multiple : "kube-dns,kube-dns-second"
+
+```
+Set kube-dns service  : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE="kube-dns"
+Set multiple services : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE="kube-dns,kube-dns-second"
 ```
 
 ## How it works?

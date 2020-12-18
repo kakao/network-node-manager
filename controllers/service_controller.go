@@ -48,9 +48,10 @@ var (
 	configIPv4Enabled bool
 	configIPv6Enabled bool
 
-	configRuleDropInvalidInput bool
-	configRuleExternalCluster  bool
-	configRuleNotTrackDNS      bool
+	configRuleDropInvalidInputEnabled bool
+	configRuleExternalClusterEnabled  bool
+	configRuleNotTrackDNSEnabled      bool
+	configRuleNotTrackDNSServices     []string
 
 	initFlag    = false
 	podCIDRIPv4 string
@@ -93,82 +94,87 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		logger.WithValues("node name", configNodeName).Info("config node name")
 		logger.WithValues("IPv4", configIPv4Enabled).WithValues("IPv6", configIPv6Enabled).Info("config network stack")
 
-		configRuleDropInvalidInput, err = configs.GetConfigRuleDropInvalidInput()
+		configRuleDropInvalidInputEnabled, err = configs.GetConfigRuleDropInvalidInputEnabled()
 		if err != nil {
 			logger.Error(err, "config error")
 			os.Exit(1)
 		}
-		configRuleExternalCluster, err = configs.GetConfigRuleExternalCluster()
+		configRuleExternalClusterEnabled, err = configs.GetConfigRuleExternalClusterEnabled()
 		if err != nil {
 			logger.Error(err, "config error")
 			os.Exit(1)
 		}
-		configRuleNotTrackDNS, err = configs.GetConfigRuleNotTrackDNS()
+		configRuleNotTrackDNSEnabled, err = configs.GetConfigRuleNotTrackDNSEnabled()
 		if err != nil {
 			logger.Error(err, "config error")
 			os.Exit(1)
 		}
-		logger.WithValues("flag", configRuleDropInvalidInput).Info("config rule drop invalid packet in INPUT chain")
-		logger.WithValues("flag", configRuleExternalCluster).Info("config rule externalIP to clusterIP")
-		logger.WithValues("flag", configRuleNotTrackDNS).Info("config rule not tracking DNS packet")
+		configRuleNotTrackDNSServices, err = configs.GetConfigRuleNotTrackDNSServices()
+		if err != nil {
+			logger.Error(err, "config error")
+			os.Exit(1)
+		}
+		logger.WithValues("enabled", configRuleDropInvalidInputEnabled).Info("config rule drop invalid packet in INPUT chain")
+		logger.WithValues("enabled", configRuleExternalClusterEnabled).Info("config rule externalIP to clusterIP")
+		logger.WithValues("enabled", configRuleNotTrackDNSEnabled).Info("config rule not tracking DNS packet")
+		if configRuleNotTrackDNSEnabled {
+			logger.WithValues("services", configRuleNotTrackDNSServices).Info("config rule not tracking DNS packet")
+		}
+
+		// Get nodes's pod CIDR
+		node := &corev1.Node{}
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: configNodeName}, node); err != nil {
+			logger.Error(err, "failed to get the pod's node info from API server")
+			os.Exit(1)
+		}
+		podCIDRIPv4, podCIDRIPv6 = getPodCIDR(node.Spec.PodCIDRs)
+		logger.WithValues("pod CIDR IPV4", podCIDRIPv4).WithValues("pod CIDR IPv6", podCIDRIPv6).Info("pod CIDR")
 
 		// Init packages
 		rules.Init(configIPv4Enabled, configIPv6Enabled)
 
-		// Run rules first
-		if configRuleDropInvalidInput {
-			if err := rules.CreateRulesDropInvalidInput(logger); err != nil {
-				logger.Error(err, "failed to create rule drop invalid packet in INPUT chain")
+		// Init or Cleanup rules
+		if configRuleDropInvalidInputEnabled {
+			if err := rules.InitRulesDropInvalidInput(logger); err != nil {
+				logger.Error(err, "failed to init rule drop invalid packet in INPUT chain")
 				os.Exit(1)
 			}
 		} else {
-			if err := rules.DeleteRulesDropInvalidInput(logger); err != nil {
-				logger.Error(err, "failed to delete rule drop invalid packet in INPUT chain")
-				os.Exit(1)
-			}
-		}
-		if configRuleNotTrackDNS {
-			if err := rules.CreateRulesNotTrackDNS(logger); err != nil {
-				logger.Error(err, "failed to create rule not tracking DNS packet")
-				os.Exit(1)
-			}
-		} else {
-			if err := rules.DeleteRulesNotTrackDNS(logger); err != nil {
-				logger.Error(err, "failed to delete rule not trackring DNS packet")
+			if err := rules.CleanupRulesDropInvalidInput(logger); err != nil {
+				logger.Error(err, "failed to cleanup rule drop invalid packet in INPUT chain")
 				os.Exit(1)
 			}
 		}
 
-		// Run rules periodically
-		ticker := time.NewTicker(60 * time.Second)
-		go func() {
-			for {
-				<-ticker.C
-
-				if configRuleDropInvalidInput {
-					if err := rules.CreateRulesDropInvalidInput(logger); err != nil {
-						logger.Error(err, "failed to create rule drop invalid packet in INPUT chain")
-					}
-				}
-				if configRuleNotTrackDNS {
-					if err := rules.CreateRulesNotTrackDNS(logger); err != nil {
-						logger.Error(err, "failed to create rule not tracking DNS packet")
-					}
-				}
-			}
-		}()
-
-		if configRuleExternalCluster {
-			// Get nodes's pod CIDR
-			node := &corev1.Node{}
-			if err := r.Client.Get(ctx, types.NamespacedName{Name: configNodeName}, node); err != nil {
-				logger.Error(err, "failed to get the pod's node info from API server")
+		if configRuleNotTrackDNSEnabled {
+			if err := rules.InitRulesNotTrackDNS(logger, podCIDRIPv4, podCIDRIPv6); err != nil {
+				logger.Error(err, "failed to init rule not tracking DNS packet")
 				os.Exit(1)
 			}
-			podCIDRIPv4, podCIDRIPv6 = getPodCIDR(node.Spec.PodCIDRs)
-			logger.WithValues("pod CIDR IPV4", podCIDRIPv4).WithValues("pod CIDR IPv6", podCIDRIPv6).Info("pod CIDR")
 
-			// Initialize externalIP to clusterIP rules
+			// Set rules for DNS services
+			for _, dnsSvcName := range configRuleNotTrackDNSServices {
+				dnsSvc := &corev1.Service{}
+				if err := r.Client.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: dnsSvcName}, dnsSvc); err != nil {
+					logger.Error(err, "failed to get DNS service info")
+					os.Exit(1)
+				}
+				logger.WithValues("DNS Service", dnsSvc.Name).WithValues("clusterIP", dnsSvc.Spec.ClusterIP).Info("DNS service info")
+
+				if err := rules.CreateRulesNotTrackDNS(logger, dnsSvc.Spec.ClusterIP); err != nil {
+					logger.Error(err, "failed to create rule not tracking DNS packet for a DNS services")
+					os.Exit(1)
+				}
+			}
+		} else {
+			if err := rules.CleanupRulesNotTrackDNS(logger); err != nil {
+				logger.Error(err, "failed to cleanup rule not trackring DNS packet")
+				os.Exit(1)
+			}
+		}
+
+		if configRuleExternalClusterEnabled {
+			// Init externalIP to clusterIP rules
 			if err := rules.InitRulesExternalCluster(logger); err != nil {
 				logger.Error(err, "failed to initalize rule externalIP to clusterIP")
 				os.Exit(1)
@@ -193,10 +199,43 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				os.Exit(1)
 			}
 		}
+
+		// Run rules periodically
+		ticker := time.NewTicker(60 * time.Second)
+		go func() {
+			for {
+				<-ticker.C
+
+				if configRuleDropInvalidInputEnabled {
+					if err := rules.InitRulesDropInvalidInput(logger); err != nil {
+						logger.Error(err, "failed to init rule drop invalid packet in INPUT chain")
+					}
+				}
+				if configRuleNotTrackDNSEnabled {
+					if err := rules.InitRulesNotTrackDNS(logger, podCIDRIPv4, podCIDRIPv6); err != nil {
+						logger.Error(err, "failed to init rule not tracking DNS packet")
+					}
+
+					// Set rules for DNS services
+					for _, dnsSvcName := range configRuleNotTrackDNSServices {
+						dnsSvc := &corev1.Service{}
+						if err := r.Client.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: dnsSvcName}, dnsSvc); err != nil {
+							logger.Error(err, "failed to get DNS service info")
+							os.Exit(1)
+						}
+
+						if err := rules.CreateRulesNotTrackDNS(logger, dnsSvc.Spec.ClusterIP); err != nil {
+							logger.Error(err, "failed to create rule not tracking DNS packet")
+							os.Exit(1)
+						}
+					}
+				}
+			}
+		}()
 	}
 
 	// ** Reconcile Loop **
-	if configRuleExternalCluster {
+	if configRuleExternalClusterEnabled {
 		// In case the iptables chain is deleted, initalize again
 		if err := rules.InitRulesExternalCluster(logger); err != nil {
 			logger.Error(err, "failed to initalize rule externalIP to clusterIP")

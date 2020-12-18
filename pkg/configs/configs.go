@@ -15,9 +15,10 @@ const (
 	EnvNetStackIPv4 = "ipv4"
 	EnvNetStackIPv6 = "ipv6"
 
-	EnvRuleDropNotTrackDNS  = "RULE_NOT_TRACK_DNS"
-	EnvRuleDropInvalidInput = "RULE_DROP_INVALID_INPUT"
-	EnvRuleExternalCluster  = "RULE_EXTERNAL_CLUSTER"
+	EnvRuleDropInvalidInputEnable  = "RULE_DROP_INVALID_INPUT_ENABLE"
+	EnvRuleExternalClusterEnable   = "RULE_EXTERNAL_CLUSTER_ENABLE"
+	EnvRuleDropNotTrackDNSEnable   = "RULE_NOT_TRACK_DNS_ENABLE"
+	EnvRuleDropNotTrackDNSServices = "RULE_NOT_TRACK_DNS_SERVICES"
 )
 
 func GetConfigNodeName() (string, error) {
@@ -53,9 +54,9 @@ func GetConfigNetStack() (bool, bool, error) {
 	return ipv4, ipv6, nil
 }
 
-func GetConfigRuleDropInvalidInput() (bool, error) {
+func GetConfigRuleDropInvalidInputEnabled() (bool, error) {
 	// organize configs
-	config := os.Getenv(EnvRuleDropInvalidInput)
+	config := os.Getenv(EnvRuleDropInvalidInputEnable)
 	config = strings.ToLower(config)
 	if config == "" {
 		return true, nil
@@ -70,9 +71,9 @@ func GetConfigRuleDropInvalidInput() (bool, error) {
 	return false, fmt.Errorf("wrong config for drop invalid packet in INPUT chain : %s", config)
 }
 
-func GetConfigRuleExternalCluster() (bool, error) {
+func GetConfigRuleExternalClusterEnabled() (bool, error) {
 	// organize configs
-	config := os.Getenv(EnvRuleExternalCluster)
+	config := os.Getenv(EnvRuleExternalClusterEnable)
 	config = strings.ToLower(config)
 	if config == "" {
 		return false, nil
@@ -87,9 +88,9 @@ func GetConfigRuleExternalCluster() (bool, error) {
 	return false, fmt.Errorf("wrong config for externalIP to clusterIP DNAT : %s", config)
 }
 
-func GetConfigRuleNotTrackDNS() (bool, error) {
+func GetConfigRuleNotTrackDNSEnabled() (bool, error) {
 	// organize configs
-	config := os.Getenv(EnvRuleDropNotTrackDNS)
+	config := os.Getenv(EnvRuleDropNotTrackDNSEnable)
 	config = strings.ToLower(config)
 	if config == "" {
 		return false, nil
@@ -101,5 +102,17 @@ func GetConfigRuleNotTrackDNS() (bool, error) {
 	} else if config == EnvConfigTrue {
 		return true, nil
 	}
-	return false, fmt.Errorf("wrong config for not tracking DNS packet : %s", config)
+	return false, fmt.Errorf("wrong config for externalIP to clusterIP DNAT : %s", config)
+}
+
+func GetConfigRuleNotTrackDNSServices() ([]string, error) {
+	// organize configs
+	configs := os.Getenv(EnvRuleDropNotTrackDNSServices)
+	configs = strings.Replace(configs, " ", "", -1)
+	configs = strings.ToLower(configs)
+	if configs == "" {
+		return []string{"kube-dns"}, nil
+	}
+
+	return strings.Split(configs, ","), nil
 }
