@@ -42,6 +42,8 @@ $ kubectl -n kube-system set env daemonset/network-node-manager POD_CIDR_IPV6="f
 
 ## Configuration
 
+The following are configurations related to rules managed by network-node-manager to solve the network issue of kubernetes. Please check the configuration and its related Rule. Network-node-manager is configured through environment variable configuration. When the environment variable is changed, the rule is dynamically set as network-node-manager is redeployed.
+
 ### Enable Drop Invalid Packet Rule in INPUT chain
 
 * Related issue : [Connection reset issue between pod and out of cluster](issues/connection_reset_issue_pod_out_cluster.md)
