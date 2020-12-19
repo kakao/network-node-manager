@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/kakao/network-node-manager/pkg/ip"
 )
 
 const (
-	EnvNodeName    = "NODE_NAME"
 	EnvConfigTrue  = "true"
 	EnvConfigFalse = "false"
 
-	EnvNetStack     = "NET_STACK"
-	EnvNetStackIPv4 = "ipv4"
-	EnvNetStackIPv6 = "ipv6"
+	EnvPodCIDRIPv4 = "POD_CIDR_IPV4"
+	EnvPodCIDRIPv6 = "POD_CIDR_IPV6"
 
 	EnvRuleDropInvalidInputEnable  = "RULE_DROP_INVALID_INPUT_ENABLE"
 	EnvRuleExternalClusterEnable   = "RULE_EXTERNAL_CLUSTER_ENABLE"
@@ -21,49 +21,37 @@ const (
 	EnvRuleDropNotTrackDNSServices = "RULE_NOT_TRACK_DNS_SERVICES"
 )
 
-func GetConfigNodeName() (string, error) {
-	// return config
-	config := os.Getenv(EnvNodeName)
-	if config == "" {
-		return "", fmt.Errorf("failed to get node name of controller's pod from %s env", EnvNodeName)
+func GetConfigPodCIDRIPv4() (string, error) {
+	cidr := os.Getenv(EnvPodCIDRIPv4)
+	cidr = strings.Replace(cidr, " ", "", -1)
+
+	if cidr == "" {
+		return "", fmt.Errorf("IPv4 pod CIDR isn't set")
+	} else if !ip.IsIPv4CIDR(cidr) {
+		return "", fmt.Errorf("wrong IPv4 pod CIDR")
 	}
-	return config, nil
+	return cidr, nil
 }
 
-func GetConfigNetStack() (bool, bool, error) {
-	// organize configs
-	configs := os.Getenv(EnvNetStack)
-	configs = strings.Replace(configs, " ", "", -1)
-	configs = strings.ToLower(configs)
-	if configs == "" {
-		return true, false, nil
-	}
+func GetConfigPodCIDRIPv6() (string, error) {
+	cidr := os.Getenv(EnvPodCIDRIPv6)
+	cidr = strings.Replace(cidr, " ", "", -1)
 
-	// return configs
-	ipv4 := false
-	ipv6 := false
-	for _, config := range strings.Split(configs, ",") {
-		if config == EnvNetStackIPv4 {
-			ipv4 = true
-		} else if config == EnvNetStackIPv6 {
-			ipv6 = true
-		} else {
-			return false, false, fmt.Errorf("wrong config for network stack : %s", config)
-		}
+	if cidr == "" {
+		return "", fmt.Errorf("IPv6 pod CIDR isn't set")
+	} else if !ip.IsIPv6CIDR(cidr) {
+		return "", fmt.Errorf("wrong IPv6 pod CIDR")
 	}
-	return ipv4, ipv6, nil
+	return cidr, nil
 }
 
 func GetConfigRuleDropInvalidInputEnabled() (bool, error) {
-	// organize configs
 	config := os.Getenv(EnvRuleDropInvalidInputEnable)
 	config = strings.ToLower(config)
+
 	if config == "" {
 		return true, nil
-	}
-
-	// return configs
-	if config == EnvConfigFalse {
+	} else if config == EnvConfigFalse {
 		return false, nil
 	} else if config == EnvConfigTrue {
 		return true, nil
@@ -72,15 +60,12 @@ func GetConfigRuleDropInvalidInputEnabled() (bool, error) {
 }
 
 func GetConfigRuleExternalClusterEnabled() (bool, error) {
-	// organize configs
 	config := os.Getenv(EnvRuleExternalClusterEnable)
 	config = strings.ToLower(config)
+
 	if config == "" {
 		return false, nil
-	}
-
-	// return configs
-	if config == EnvConfigFalse {
+	} else if config == EnvConfigFalse {
 		return false, nil
 	} else if config == EnvConfigTrue {
 		return true, nil
@@ -89,15 +74,12 @@ func GetConfigRuleExternalClusterEnabled() (bool, error) {
 }
 
 func GetConfigRuleNotTrackDNSEnabled() (bool, error) {
-	// organize configs
 	config := os.Getenv(EnvRuleDropNotTrackDNSEnable)
 	config = strings.ToLower(config)
+
 	if config == "" {
 		return false, nil
-	}
-
-	// return configs
-	if config == EnvConfigFalse {
+	} else if config == EnvConfigFalse {
 		return false, nil
 	} else if config == EnvConfigTrue {
 		return true, nil
@@ -106,13 +88,12 @@ func GetConfigRuleNotTrackDNSEnabled() (bool, error) {
 }
 
 func GetConfigRuleNotTrackDNSServices() ([]string, error) {
-	// organize configs
 	configs := os.Getenv(EnvRuleDropNotTrackDNSServices)
 	configs = strings.Replace(configs, " ", "", -1)
 	configs = strings.ToLower(configs)
+
 	if configs == "" {
 		return []string{"kube-dns"}, nil
 	}
-
 	return strings.Split(configs, ","), nil
 }

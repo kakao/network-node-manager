@@ -12,9 +12,6 @@ NAME           TYPE           CLUSTER-IP      EXTERNAL-IP    PORT(S)            
 lb-service-1   LoadBalancer   10.231.42.164   10.19.20.201   80:31751/TCP,443:30126/TCP   16d
 lb-service-2   LoadBalancer   10.231.2.62     10.19.22.57    80:32352/TCP,443:31549/TCP   16d
 
-$ kubectl get nodes worker -o jsonpath='{.spec.podCIDRs}'
-["10.240.2.128/25"]
-
 $ iptables -t nat -nvL
 ...
 Chain PREROUTING (policy ACCEPT 0 packets, 0 bytes)
@@ -42,10 +39,10 @@ Chain NMANAGER_EX_CLUS_OUTPUT (1 references)
 
 Chain NMANAGER_EX_CLUS_PREROUTING (1 references)
  pkts bytes target     prot opt in     out     source               destination
-    0     0 KUBE-MARK-MASQ  all  --  *      *       10.240.2.128/25      10.19.20.201         /* default/lb-service-1 */
-    0     0 DNAT       all  --  *      *       10.240.2.128/25      10.19.20.201         /* default/lb-service-1 */ to:10.231.42.164
-    1    60 KUBE-MARK-MASQ  all  --  *      *       10.240.2.128/25      10.19.22.57          /* default/lb-service-2 */
-    1    60 DNAT       all  --  *      *       10.240.2.128/25      10.19.22.57          /* default/lb-service-2 */ to:10.231.2.62
+    0     0 KUBE-MARK-MASQ  all  --  *      *       192.167.0.0/16       10.19.20.201         /* default/lb-service-1 */
+    0     0 DNAT       all  --  *      *       192.167.0.0/16       10.19.20.201         /* default/lb-service-1 */ to:10.231.42.164
+    1    60 KUBE-MARK-MASQ  all  --  *      *       192.167.0.0/16       10.19.22.57          /* default/lb-service-2 */
+    1    60 DNAT       all  --  *      *       192.168.0.0/16       10.19.22.57          /* default/lb-service-2 */ to:10.231.2.62
 ...
 ```
 

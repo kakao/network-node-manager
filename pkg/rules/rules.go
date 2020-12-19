@@ -3,6 +3,7 @@ package rules
 import (
 	"github.com/go-logr/logr"
 
+	"github.com/kakao/network-node-manager/pkg/ip"
 	"github.com/kakao/network-node-manager/pkg/iptables"
 )
 
@@ -27,18 +28,18 @@ const (
 
 // Vars
 var (
-	configIPv4Enabled bool
-	configIPv6Enabled bool
+	podCIDRIPv4 string
+	podCIDRIPv6 string
 )
 
-func Init(configIPv4, configIPv6 bool) {
-	configIPv4Enabled = configIPv4
-	configIPv6Enabled = configIPv6
+func Init(cidrIPv4, cidrIPv6 string) {
+	podCIDRIPv4 = cidrIPv4
+	podCIDRIPv6 = cidrIPv6
 }
 
 func initBaseChains(logger logr.Logger) error {
 	// IPv4
-	if configIPv4Enabled {
+	if ip.IsIPv4CIDR(podCIDRIPv4) {
 		// Create base chain in tables
 		out, err := iptables.CreateChainIPv4(iptables.TableRaw, ChainBasePrerouting)
 		if err != nil {
@@ -100,7 +101,7 @@ func initBaseChains(logger logr.Logger) error {
 	}
 
 	// IPv6
-	if configIPv6Enabled {
+	if ip.IsIPv6CIDR(podCIDRIPv6) {
 		// Create base chain in nat table
 		out, err := iptables.CreateChainIPv6(iptables.TableRaw, ChainBasePrerouting)
 		if err != nil {

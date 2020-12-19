@@ -1,8 +1,6 @@
 package rules
 
 import (
-	"errors"
-
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -19,7 +17,7 @@ func InitRulesExternalCluster(logger logr.Logger) error {
 	}
 
 	// IPv4
-	if configIPv4Enabled {
+	if ip.IsIPv4CIDR(podCIDRIPv4) {
 		// Create chain in nat table
 		out, err := iptables.CreateChainIPv4(iptables.TableNAT, ChainNATExternalClusterPrerouting)
 		if err != nil {
@@ -47,7 +45,7 @@ func InitRulesExternalCluster(logger logr.Logger) error {
 		}
 	}
 	// IPv6
-	if configIPv6Enabled {
+	if ip.IsIPv6CIDR(podCIDRIPv6) {
 		// Create chain in nat table
 		out, err := iptables.CreateChainIPv6(iptables.TableNAT, ChainNATExternalClusterPrerouting)
 		if err != nil {
@@ -80,7 +78,7 @@ func InitRulesExternalCluster(logger logr.Logger) error {
 
 func DestoryRulesExternalCluster(logger logr.Logger) error {
 	// IPv4
-	if configIPv4Enabled {
+	if ip.IsIPv4CIDR(podCIDRIPv4) {
 		// Delete jump rule to each chain in nat table
 		ruleJumpPre := []string{"-j", ChainNATExternalClusterPrerouting}
 		out, err := iptables.DeleteRuleIPv4(iptables.TableNAT, ChainBasePrerouting, "", ruleJumpPre...)
@@ -108,7 +106,7 @@ func DestoryRulesExternalCluster(logger logr.Logger) error {
 		}
 	}
 	// IPv6
-	if configIPv6Enabled {
+	if ip.IsIPv6CIDR(podCIDRIPv6) {
 		// Delete jump rule to each chain in nat table
 		ruleJumpPre := []string{"-j", ChainNATExternalClusterPrerouting}
 		out, err := iptables.DeleteRuleIPv6(iptables.TableNAT, ChainBasePrerouting, "", ruleJumpPre...)
@@ -139,9 +137,9 @@ func DestoryRulesExternalCluster(logger logr.Logger) error {
 	return nil
 }
 
-func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList, podCIDRIPv4, podCIDRIPv6 string) error {
+func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) error {
 	// IPv4
-	if configIPv4Enabled {
+	if ip.IsIPv4CIDR(podCIDRIPv4) {
 		// Make up service map
 		svcMap := make(map[string]*corev1.Service)
 		for _, svc := range svcs.Items {
@@ -221,7 +219,7 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList, p
 		}
 	}
 	// IPv6
-	if configIPv6Enabled {
+	if ip.IsIPv6CIDR(podCIDRIPv6) {
 		// Make up service map
 		svcMap := make(map[string]*corev1.Service)
 		for _, svc := range svcs.Items {
@@ -304,10 +302,10 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList, p
 	return nil
 }
 
-func CreateRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6 string) error {
+func CreateRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP, externalIP string) error {
 	// Don't use spec.ipFamily to distingush between IPv4 and IPv6 Address
 	// for kubernetes version that dosen't support IPv6 dualstack
-	if configIPv4Enabled && ip.IsIPv4Addr(clusterIP) {
+	if ip.IsIPv4CIDR(podCIDRIPv4) && ip.IsIPv4Addr(clusterIP) {
 		// IPv4
 		// Set prerouting
 		rulePreMasq := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", ChainNATKubeMarkMasq}
@@ -336,7 +334,7 @@ func CreateRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP
 			logger.Error(err, out)
 			return err
 		}
-	} else if configIPv6Enabled && ip.IsIPv6Addr(clusterIP) {
+	} else if ip.IsIPv6CIDR(podCIDRIPv6) && ip.IsIPv6Addr(clusterIP) {
 		// IPv6
 		// Set prerouting
 		rulePreMasq := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", ChainNATKubeMarkMasq}
@@ -365,19 +363,15 @@ func CreateRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP
 			logger.Error(err, out)
 			return err
 		}
-	} else {
-		if ip.IsVaildIP(clusterIP) {
-			logger.WithValues("clusterIP", clusterIP).Error(errors.New("invalid IP"), "invaild IP")
-		}
 	}
 
 	return nil
 }
 
-func DeleteRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6 string) error {
+func DeleteRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP, externalIP string) error {
 	// Don't use spec.ipFamily to distingush between IPv4 and IPv6 Address
 	// for kubernetes version that dosen't support IPv6 dualstack
-	if configIPv4Enabled && ip.IsIPv4Addr(clusterIP) {
+	if ip.IsIPv4CIDR(podCIDRIPv4) && ip.IsIPv4Addr(clusterIP) {
 		// IPv4
 		// Unset prerouting
 		rulePreMasq := []string{"-s", podCIDRIPv4, "-d", externalIP, "-j", ChainNATKubeMarkMasq}
@@ -406,7 +400,7 @@ func DeleteRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP
 			logger.Error(err, out)
 			return err
 		}
-	} else if configIPv6Enabled && ip.IsIPv6Addr(clusterIP) {
+	} else if ip.IsIPv6CIDR(podCIDRIPv6) && ip.IsIPv6Addr(clusterIP) {
 		// IPv6
 		// Unset prerouting
 		rulePreMasq := []string{"-s", podCIDRIPv6, "-d", externalIP, "-j", ChainNATKubeMarkMasq}
@@ -435,11 +429,8 @@ func DeleteRulesExternalCluster(logger logr.Logger, req *ctrl.Request, clusterIP
 			logger.Error(err, out)
 			return err
 		}
-	} else {
-		if ip.IsVaildIP(clusterIP) {
-			logger.WithValues("clusterIP", clusterIP).Error(errors.New("invalid IP"), "invaild IP")
-		}
 	}
+
 	return nil
 }
 

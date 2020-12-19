@@ -13,26 +13,34 @@ network-node-manager now supports below CPU architectures.
 * amd64
 * arm64
 
-Deploy network-node-managers through below command according to kube-proxy mode.
+Deploy network-node-manager through below command according to kube-proxy mode. After deploying network-node-manager, the "POD_CIDR_IPv4" environment variable must be set. And if you use IPv6 service, you must also set the "POD_CIDR_IPv6" environment variable.
 
 ```
-iptables proxy mode : kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/master/deploy/network-node-manager_iptables.yml
-IPVS proxy mode     : kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/master/deploy/network-node-manager_ipvs.yml
+iptables proxy mode 
+$ kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/master/deploy/network-node-manager_iptables.yml
+$ kubectl -n kube-system set env daemonset/network-node-manager POD_CIDR_IPV4=[IPv4 POD CIDR]
+$ kubectl -n kube-system set env daemonset/network-node-manager POD_CIDR_IPV6=[IPv6 POD CIDR]
+
+IPVS proxy mode
+$ kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/master/deploy/network-node-manager_ipvs.yml
+$ kubectl -n kube-system set env daemonset/network-node-manager POD_CIDR_IPV4=[IPv4 POD CIDR]
+$ kubectl -n kube-system set env daemonset/network-node-manager POD_CIDR_IPV6=[IPv6 POD CIDR]
+```
+
+Examples are below
+
+```
+Example 1
+$ kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/master/deploy/network-node-manager_iptables.yml
+$ kubectl -n kube-system set env daemonset/network-node-manager POD_CIDR_IPV4="10.244.0.0/16"
+
+Example 2
+$ kubectl apply -f https://raw.githubusercontent.com/kakao/network-node-manager/master/deploy/network-node-manager_ipvs.yml
+$ kubectl -n kube-system set env daemonset/network-node-manager POD_CIDR_IPV4="192.167.0.0/16"
+$ kubectl -n kube-system set env daemonset/network-node-manager POD_CIDR_IPV6="fdbb::0/64"
 ```
 
 ## Configuration
-
-### Set Network Stack (IPv4, IPv6)
-
-* Default : "ipv4"
-* iptables proxy mode manifest : "ipv4"
-* IPVS proxy mode manifest : "ipv4"
-
-```
-IPv4      : kubectl -n kube-system set env daemonset/network-node-manager NET_STACK=ipv4
-IPv6      : kubectl -n kube-system set env daemonset/network-node-manager NET_STACK=ipv6
-IPv4,IPv6 : kubectl -n kube-system set env daemonset/network-node-manager NET_STACK=ipv4,ipv6
-```
 
 ### Enable Drop Invalid Packet Rule in INPUT chain
 
@@ -42,10 +50,12 @@ IPv4,IPv6 : kubectl -n kube-system set env daemonset/network-node-manager NET_ST
 * IPVS proxy mode manifest : true
 
 ```
-On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_INVALID_INPUT_ENABLE=true
-Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_INVALID_INPUT_ENABLE=false
-```
+On
+$ kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_INVALID_INPUT_ENABLE=true
 
+Off
+$ kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_INVALID_INPUT_ENABLE=false
+```
 ### Enable External-IP to Cluster-IP DNAT Rule
 
 * Related issue : [External-IP access issue with IPVS proxy mode](issues/external_IP_access_issue_IPVS_proxy_mode.md)
@@ -54,8 +64,11 @@ Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_DROP_IN
 * IPVS proxy mode manifest : true
 
 ```
-On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER_ENABLE=true
-Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER_ENABLE=false
+On
+$ kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER_ENABLE=true
+
+Off
+$ kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER_ENABLE=false
 ```
 
 ### Enable Not Track DNS Packet Rule
@@ -66,8 +79,11 @@ Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNA
 * IPVS proxy mode manifest : false
 
 ```
-On  : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE=true
-Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE=false
+On
+$ kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE=true
+
+Off
+$ kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE=false
 ```
 
 ### Set Kubernetes DNS Service Names for Not Track DNS Packet Rule
@@ -77,8 +93,11 @@ Off : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRA
 * Support multiple : "kube-dns,kube-dns-second"
 
 ```
-Set kube-dns service  : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE="kube-dns"
-Set multiple services : kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE="kube-dns,kube-dns-second"
+Set kube-dns service
+$ kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_SERVICES="kube-dns"
+
+Set multiple services
+$ kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_SERVICES="kube-dns,kube-dns-second"
 ```
 
 ## How it works?

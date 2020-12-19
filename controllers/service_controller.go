@@ -1,6 +1,4 @@
 /*
-
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -19,7 +17,6 @@ package controllers
 import (
 	"context"
 	"os"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -31,7 +28,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/kakao/network-node-manager/pkg/configs"
-	"github.com/kakao/network-node-manager/pkg/ip"
 	"github.com/kakao/network-node-manager/pkg/rules"
 )
 
@@ -44,9 +40,8 @@ type ServiceReconciler struct {
 
 // Variables
 var (
-	configNodeName    string
-	configIPv4Enabled bool
-	configIPv6Enabled bool
+	configPodCIDRIPv4 string
+	configPodCIDRIPv6 string
 
 	configRuleDropInvalidInputEnabled bool
 	configRuleExternalClusterEnabled  bool
@@ -80,20 +75,13 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		logger := r.Log.WithName("initalize")
 		logger.Info("initalize service contoller")
 
-		// Get configs from env
-		configNodeName, err = configs.GetConfigNodeName()
-		if err != nil {
-			logger.Error(err, "config error")
-			os.Exit(1)
-		}
-		configIPv4Enabled, configIPv6Enabled, err = configs.GetConfigNetStack()
-		if err != nil {
-			logger.Error(err, "config error")
-			os.Exit(1)
-		}
-		logger.WithValues("node name", configNodeName).Info("config node name")
-		logger.WithValues("IPv4", configIPv4Enabled).WithValues("IPv6", configIPv6Enabled).Info("config network stack")
+		// Get pod CIDR configs
+		configPodCIDRIPv4, _ = configs.GetConfigPodCIDRIPv4()
+		configPodCIDRIPv6, _ = configs.GetConfigPodCIDRIPv6()
+		logger.WithValues("IPv4 pod cIDR", configPodCIDRIPv4).Info("config IPv4 pod CIDR")
+		logger.WithValues("IPv6 pod cIDR", configPodCIDRIPv6).Info("config IPv6 pod CIDR")
 
+		// Get rule configs
 		configRuleDropInvalidInputEnabled, err = configs.GetConfigRuleDropInvalidInputEnabled()
 		if err != nil {
 			logger.Error(err, "config error")
@@ -121,17 +109,8 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			logger.WithValues("services", configRuleNotTrackDNSServices).Info("config rule not tracking DNS packet")
 		}
 
-		// Get nodes's pod CIDR
-		node := &corev1.Node{}
-		if err := r.Client.Get(ctx, types.NamespacedName{Name: configNodeName}, node); err != nil {
-			logger.Error(err, "failed to get the pod's node info from API server")
-			os.Exit(1)
-		}
-		podCIDRIPv4, podCIDRIPv6 = getPodCIDR(node.Spec.PodCIDRs)
-		logger.WithValues("pod CIDR IPV4", podCIDRIPv4).WithValues("pod CIDR IPv6", podCIDRIPv6).Info("pod CIDR")
-
 		// Init packages
-		rules.Init(configIPv4Enabled, configIPv6Enabled)
+		rules.Init(configPodCIDRIPv4, configPodCIDRIPv6)
 
 		// Init or Cleanup rules
 		if configRuleDropInvalidInputEnabled {
@@ -147,7 +126,7 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}
 
 		if configRuleNotTrackDNSEnabled {
-			if err := rules.InitRulesNotTrackDNS(logger, podCIDRIPv4, podCIDRIPv6); err != nil {
+			if err := rules.InitRulesNotTrackDNS(logger); err != nil {
 				logger.Error(err, "failed to init rule not tracking DNS packet")
 				os.Exit(1)
 			}
@@ -188,7 +167,7 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			}
 
 			// Cleanup externalIP to clusterIP rules for deleted services
-			if err := rules.CleanupRulesExternalCluster(logger, svcs, podCIDRIPv4, podCIDRIPv6); err != nil {
+			if err := rules.CleanupRulesExternalCluster(logger, svcs); err != nil {
 				logger.Error(err, "failed to cleanup rule externalIP to clusterIP")
 				os.Exit(1)
 			}
@@ -212,7 +191,7 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 					}
 				}
 				if configRuleNotTrackDNSEnabled {
-					if err := rules.InitRulesNotTrackDNS(logger, podCIDRIPv4, podCIDRIPv6); err != nil {
+					if err := rules.InitRulesNotTrackDNS(logger); err != nil {
 						logger.Error(err, "failed to init rule not tracking DNS packet")
 					}
 
@@ -263,7 +242,7 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 					// Delete rules
 					logger.WithValues("externalIP", oldExternalIP).WithValues("clusterIP", oldClusterIP).Info("delete rule externalIp to clusterIP")
-					if err := rules.DeleteRulesExternalCluster(logger, &req, oldClusterIP, oldExternalIP, podCIDRIPv4, podCIDRIPv6); err != nil {
+					if err := rules.DeleteRulesExternalCluster(logger, &req, oldClusterIP, oldExternalIP); err != nil {
 						return ctrl.Result{}, err
 					}
 				}
@@ -289,7 +268,7 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 			// Create rules
 			logger.WithValues("externalIP", externalIP).WithValues("clusterIP", clusterIP).Info("create iptables rules")
-			if err := rules.CreateRulesExternalCluster(logger, &req, clusterIP, externalIP, podCIDRIPv4, podCIDRIPv6); err != nil {
+			if err := rules.CreateRulesExternalCluster(logger, &req, clusterIP, externalIP); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -303,16 +282,4 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
 		Complete(r)
-}
-
-func getPodCIDR(cidrs []string) (ipv4CIDR string, ipv6CIDR string) {
-	for _, cidr := range cidrs {
-		addr := strings.Split(cidr, "/")[0]
-		if ip.IsIPv4Addr(addr) {
-			ipv4CIDR = cidr
-		} else if ip.IsIPv6Addr(addr) {
-			ipv6CIDR = cidr
-		}
-	}
-	return
 }

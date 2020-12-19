@@ -5,80 +5,42 @@ import (
 	"testing"
 )
 
-func TestGetConfigNodeName(t *testing.T) {
-	os.Setenv(EnvNodeName, "node")
-	nodeName, _ := GetConfigNodeName()
-	if nodeName != "node" {
-		t.Errorf("wrong result - %s", "node")
-	}
-}
-
-func TestGetConfigNetStack(t *testing.T) {
-	os.Setenv(EnvNetStack, "ipv4")
-	ipv4, ipv6, _ := GetConfigNetStack()
-	if ipv4 != true || ipv6 != false {
-		t.Errorf("wrong result - %s", "ipv4")
-	}
-
-	os.Setenv(EnvNetStack, "IPV4")
-	ipv4, ipv6, _ = GetConfigNetStack()
-	if ipv4 != true || ipv6 != false {
-		t.Errorf("wrong result - %s", "IPV4")
-	}
-
-	os.Setenv(EnvNetStack, "ipv6")
-	ipv4, ipv6, _ = GetConfigNetStack()
-	if ipv4 != false || ipv6 != true {
-		t.Errorf("wrong result - %s", "ipv6")
-	}
-
-	os.Setenv(EnvNetStack, "IPV6")
-	ipv4, ipv6, _ = GetConfigNetStack()
-	if ipv4 != false || ipv6 != true {
-		t.Errorf("wrong result - %s", "IPV6")
-	}
-
-	os.Setenv(EnvNetStack, "ipv5")
-	_, _, err := GetConfigNetStack()
+func TestGetConfigPodCIDR(t *testing.T) {
+	os.Setenv(EnvPodCIDRIPv4, "")
+	_, err := GetConfigPodCIDRIPv4()
 	if err == nil {
-		t.Errorf("wrong result - %s", "ipv5")
+		t.Errorf("wrong result - %s", "empty")
 	}
 
-	os.Setenv(EnvNetStack, "ipv4,ipv6")
-	ipv4, ipv6, _ = GetConfigNetStack()
-	if ipv4 != true || ipv6 != true {
-		t.Errorf("wrong result - %s", "ipv4,ipv6")
+	os.Setenv(EnvPodCIDRIPv4, "127.0.0.1/24")
+	_, err = GetConfigPodCIDRIPv4()
+	if err != nil {
+		t.Errorf("wrong result - %s", "127.0.0.1/24")
 	}
 
-	os.Setenv(EnvNetStack, "ipv4, ipv6")
-	ipv4, ipv6, _ = GetConfigNetStack()
-	if ipv4 != true || ipv6 != true {
-		t.Errorf("wrong result - %s", "ipv4, ipv6")
-	}
-
-	os.Setenv(EnvNetStack, "ipv6, ipv4")
-	ipv4, ipv6, _ = GetConfigNetStack()
-	if ipv4 != true || ipv6 != true {
-		t.Errorf("wrong result - %s", "ipv6,ipv4")
+	os.Setenv(EnvPodCIDRIPv4, "127.0.0.1/40")
+	_, err = GetConfigPodCIDRIPv4()
+	if err == nil {
+		t.Errorf("wrong result - %s", "127.0.0.1/40")
 	}
 }
 
 func TestGetConfigRuleExternalCluster(t *testing.T) {
 	os.Setenv(EnvRuleExternalClusterEnable, "")
-	flag, _ := GetConfigRuleExternalClusterEnabled()
-	if flag {
+	enabled, _ := GetConfigRuleExternalClusterEnabled()
+	if enabled {
 		t.Errorf("wrong result - %s", "")
 	}
 
 	os.Setenv(EnvRuleExternalClusterEnable, "false")
-	flag, _ = GetConfigRuleExternalClusterEnabled()
-	if flag {
+	enabled, _ = GetConfigRuleExternalClusterEnabled()
+	if enabled {
 		t.Errorf("wrong result - %s", "false")
 	}
 
 	os.Setenv(EnvRuleExternalClusterEnable, "true")
-	flag, _ = GetConfigRuleExternalClusterEnabled()
-	if !flag {
+	enabled, _ = GetConfigRuleExternalClusterEnabled()
+	if !enabled {
 		t.Errorf("wrong result - %s", "true")
 	}
 

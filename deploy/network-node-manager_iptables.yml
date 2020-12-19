@@ -82,11 +82,6 @@ spec:
           requests:
             cpu: 100m
             memory: 100Mi
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
         securityContext:
           capabilities:
             add: ["NET_ADMIN"]
