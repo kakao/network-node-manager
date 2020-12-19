@@ -15,10 +15,8 @@ const (
 	EnvPodCIDRIPv4 = "POD_CIDR_IPV4"
 	EnvPodCIDRIPv6 = "POD_CIDR_IPV6"
 
-	EnvRuleDropInvalidInputEnable  = "RULE_DROP_INVALID_INPUT_ENABLE"
-	EnvRuleExternalClusterEnable   = "RULE_EXTERNAL_CLUSTER_ENABLE"
-	EnvRuleDropNotTrackDNSEnable   = "RULE_NOT_TRACK_DNS_ENABLE"
-	EnvRuleDropNotTrackDNSServices = "RULE_NOT_TRACK_DNS_SERVICES"
+	EnvRuleDropInvalidInputEnable = "RULE_DROP_INVALID_INPUT_ENABLE"
+	EnvRuleExternalClusterEnable  = "RULE_EXTERNAL_CLUSTER_ENABLE"
 )
 
 func GetConfigPodCIDRIPv4() (string, error) {
@@ -71,29 +69,4 @@ func GetConfigRuleExternalClusterEnabled() (bool, error) {
 		return true, nil
 	}
 	return false, fmt.Errorf("wrong config for externalIP to clusterIP DNAT : %s", config)
-}
-
-func GetConfigRuleNotTrackDNSEnabled() (bool, error) {
-	config := os.Getenv(EnvRuleDropNotTrackDNSEnable)
-	config = strings.ToLower(config)
-
-	if config == "" {
-		return false, nil
-	} else if config == EnvConfigFalse {
-		return false, nil
-	} else if config == EnvConfigTrue {
-		return true, nil
-	}
-	return false, fmt.Errorf("wrong config for externalIP to clusterIP DNAT : %s", config)
-}
-
-func GetConfigRuleNotTrackDNSServices() ([]string, error) {
-	configs := os.Getenv(EnvRuleDropNotTrackDNSServices)
-	configs = strings.Replace(configs, " ", "", -1)
-	configs = strings.ToLower(configs)
-
-	if configs == "" {
-		return []string{"kube-dns"}, nil
-	}
-	return strings.Split(configs, ","), nil
 }

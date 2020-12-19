@@ -20,8 +20,6 @@ const (
 	ChainFilterDropInvalidInput       = "NMANAGER_DROP_INVALID_INPUT"
 	ChainNATExternalClusterPrerouting = "NMANAGER_EX_CLUS_PREROUTING"
 	ChainNATExternalClusterOutput     = "NMANAGER_EX_CLUS_OUTPUT"
-	ChainRawNotTrackDNSPrerouting     = "NMANAGER_NOT_DNS_PREROUTING"
-	ChainRawNotTrackDNSOutput         = "NMANAGER_NOT_DNS_OUTPUT"
 
 	ChainNATKubeMarkMasq = "KUBE-MARK-MASQ"
 )
@@ -41,17 +39,7 @@ func initBaseChains(logger logr.Logger) error {
 	// IPv4
 	if ip.IsIPv4CIDR(podCIDRIPv4) {
 		// Create base chain in tables
-		out, err := iptables.CreateChainIPv4(iptables.TableRaw, ChainBasePrerouting)
-		if err != nil {
-			logger.Error(err, out)
-			return err
-		}
-		out, err = iptables.CreateChainIPv4(iptables.TableRaw, ChainBaseOutput)
-		if err != nil {
-			logger.Error(err, out)
-			return err
-		}
-		out, err = iptables.CreateChainIPv4(iptables.TableFilter, ChainBaseInput)
+		out, err := iptables.CreateChainIPv4(iptables.TableFilter, ChainBaseInput)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -68,18 +56,6 @@ func initBaseChains(logger logr.Logger) error {
 		}
 
 		// Create jump rule to each chain in tables
-		ruleJumpRawPre := []string{"-j", ChainBasePrerouting}
-		out, err = iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainPrerouting, "", ruleJumpRawPre...)
-		if err != nil {
-			logger.Error(err, out)
-			return err
-		}
-		ruleJumpRawOut := []string{"-j", ChainBaseOutput}
-		out, err = iptables.CreateRuleFirstIPv4(iptables.TableRaw, ChainOutput, "", ruleJumpRawOut...)
-		if err != nil {
-			logger.Error(err, out)
-			return err
-		}
 		ruleJumpFilterInput := []string{"-j", ChainBaseInput}
 		out, err = iptables.CreateRuleFirstIPv4(iptables.TableFilter, ChainInput, "", ruleJumpFilterInput...)
 		if err != nil {
@@ -103,17 +79,7 @@ func initBaseChains(logger logr.Logger) error {
 	// IPv6
 	if ip.IsIPv6CIDR(podCIDRIPv6) {
 		// Create base chain in nat table
-		out, err := iptables.CreateChainIPv6(iptables.TableRaw, ChainBasePrerouting)
-		if err != nil {
-			logger.Error(err, out)
-			return err
-		}
-		out, err = iptables.CreateChainIPv6(iptables.TableRaw, ChainBaseOutput)
-		if err != nil {
-			logger.Error(err, out)
-			return err
-		}
-		out, err = iptables.CreateChainIPv6(iptables.TableFilter, ChainBaseInput)
+		out, err := iptables.CreateChainIPv6(iptables.TableFilter, ChainBaseInput)
 		if err != nil {
 			logger.Error(err, out)
 			return err
@@ -130,18 +96,6 @@ func initBaseChains(logger logr.Logger) error {
 		}
 
 		// Create jump rule to each chain in tables
-		ruleJumpRawPre := []string{"-j", ChainBasePrerouting}
-		out, err = iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainPrerouting, "", ruleJumpRawPre...)
-		if err != nil {
-			logger.Error(err, out)
-			return err
-		}
-		ruleJumpRawOut := []string{"-j", ChainBaseOutput}
-		out, err = iptables.CreateRuleFirstIPv6(iptables.TableRaw, ChainOutput, "", ruleJumpRawOut...)
-		if err != nil {
-			logger.Error(err, out)
-			return err
-		}
 		ruleJumpFilterInput := []string{"-j", ChainBaseInput}
 		out, err = iptables.CreateRuleFirstIPv6(iptables.TableFilter, ChainInput, "", ruleJumpFilterInput...)
 		if err != nil {

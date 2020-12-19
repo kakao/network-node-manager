@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -45,8 +44,6 @@ var (
 
 	configRuleDropInvalidInputEnabled bool
 	configRuleExternalClusterEnabled  bool
-	configRuleNotTrackDNSEnabled      bool
-	configRuleNotTrackDNSServices     []string
 
 	initFlag    = false
 	podCIDRIPv4 string
@@ -92,22 +89,8 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			logger.Error(err, "config error")
 			os.Exit(1)
 		}
-		configRuleNotTrackDNSEnabled, err = configs.GetConfigRuleNotTrackDNSEnabled()
-		if err != nil {
-			logger.Error(err, "config error")
-			os.Exit(1)
-		}
-		configRuleNotTrackDNSServices, err = configs.GetConfigRuleNotTrackDNSServices()
-		if err != nil {
-			logger.Error(err, "config error")
-			os.Exit(1)
-		}
 		logger.WithValues("enabled", configRuleDropInvalidInputEnabled).Info("config rule drop invalid packet in INPUT chain")
 		logger.WithValues("enabled", configRuleExternalClusterEnabled).Info("config rule externalIP to clusterIP")
-		logger.WithValues("enabled", configRuleNotTrackDNSEnabled).Info("config rule not tracking DNS packet")
-		if configRuleNotTrackDNSEnabled {
-			logger.WithValues("services", configRuleNotTrackDNSServices).Info("config rule not tracking DNS packet")
-		}
 
 		// Init packages
 		rules.Init(configPodCIDRIPv4, configPodCIDRIPv6)
@@ -121,33 +104,6 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		} else {
 			if err := rules.CleanupRulesDropInvalidInput(logger); err != nil {
 				logger.Error(err, "failed to cleanup rule drop invalid packet in INPUT chain")
-				os.Exit(1)
-			}
-		}
-
-		if configRuleNotTrackDNSEnabled {
-			if err := rules.InitRulesNotTrackDNS(logger); err != nil {
-				logger.Error(err, "failed to init rule not tracking DNS packet")
-				os.Exit(1)
-			}
-
-			// Set rules for DNS services
-			for _, dnsSvcName := range configRuleNotTrackDNSServices {
-				dnsSvc := &corev1.Service{}
-				if err := r.Client.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: dnsSvcName}, dnsSvc); err != nil {
-					logger.Error(err, "failed to get DNS service info")
-					os.Exit(1)
-				}
-				logger.WithValues("DNS Service", dnsSvc.Name).WithValues("clusterIP", dnsSvc.Spec.ClusterIP).Info("DNS service info")
-
-				if err := rules.CreateRulesNotTrackDNS(logger, dnsSvc.Spec.ClusterIP); err != nil {
-					logger.Error(err, "failed to create rule not tracking DNS packet for a DNS services")
-					os.Exit(1)
-				}
-			}
-		} else {
-			if err := rules.CleanupRulesNotTrackDNS(logger); err != nil {
-				logger.Error(err, "failed to cleanup rule not trackring DNS packet")
 				os.Exit(1)
 			}
 		}
@@ -188,25 +144,6 @@ func (r *ServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				if configRuleDropInvalidInputEnabled {
 					if err := rules.InitRulesDropInvalidInput(logger); err != nil {
 						logger.Error(err, "failed to init rule drop invalid packet in INPUT chain")
-					}
-				}
-				if configRuleNotTrackDNSEnabled {
-					if err := rules.InitRulesNotTrackDNS(logger); err != nil {
-						logger.Error(err, "failed to init rule not tracking DNS packet")
-					}
-
-					// Set rules for DNS services
-					for _, dnsSvcName := range configRuleNotTrackDNSServices {
-						dnsSvc := &corev1.Service{}
-						if err := r.Client.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: dnsSvcName}, dnsSvc); err != nil {
-							logger.Error(err, "failed to get DNS service info")
-							os.Exit(1)
-						}
-
-						if err := rules.CreateRulesNotTrackDNS(logger, dnsSvc.Spec.ClusterIP); err != nil {
-							logger.Error(err, "failed to create rule not tracking DNS packet")
-							os.Exit(1)
-						}
 					}
 				}
 			}

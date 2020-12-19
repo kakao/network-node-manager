@@ -4,7 +4,6 @@ network-node-manager is a kubernetes controller that controls the network config
 
 * [Connection reset issue between pod and out of cluster](issues/connection_reset_issue_pod_out_cluster.md)
 * [External-IP access issue with IPVS proxy mode](issues/external_IP_access_issue_IPVS_proxy_mode.md)
-* [DNS packet dropped issue](issues/DNS_packet_dropped_issue.md) 
 
 ## Deploy
 
@@ -71,35 +70,6 @@ $ kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CL
 
 Off
 $ kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CLUSTER_ENABLE=false
-```
-
-### Enable Not Track DNS Packet Rule
-
-* Related issue : [DNS packet dropped issue](issues/DNS_packet_dropped_issue.md)   
-* Default : false
-* iptables proxy mode manifest : false
-* IPVS proxy mode manifest : false
-
-```
-On
-$ kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE=true
-
-Off
-$ kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_ENABLE=false
-```
-
-### Set Kubernetes DNS Service Names for Not Track DNS Packet Rule
-
-* Related issue : [DNS packet dropped issue](issues/DNS_packet_dropped_issue.md)   
-* Default : "kube-dns"
-* Support multiple : "kube-dns,kube-dns-second"
-
-```
-Set kube-dns service
-$ kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_SERVICES="kube-dns"
-
-Set multiple services
-$ kubectl -n kube-system set env daemonset/network-node-manager RULE_NOT_TRACK_DNS_SERVICES="kube-dns,kube-dns-second"
 ```
 
 ## How it works?
