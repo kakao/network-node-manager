@@ -27,6 +27,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/kakao/network-node-manager/pkg/configs"
+	"github.com/kakao/network-node-manager/pkg/ip"
 	"github.com/kakao/network-node-manager/pkg/rules"
 )
 
@@ -171,10 +172,22 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 					return ctrl.Result{}, nil
 				}
 
+				// Get service cluster IPs for each family
+				oldClusterIPv4 := GetClusterIPByFamily(corev1.IPv4Protocol, &oldSvc)
+				oldClusterIPv6 := GetClusterIPByFamily(corev1.IPv6Protocol, &oldSvc)
+
+				// Get all the service's external IPs
+				oldExternalIPs := []string{}
+				for _, ingress := range svc.Status.LoadBalancer.Ingress {
+					oldExternalIPs = append(oldExternalIPs, ingress.IP)
+				}
+
 				// Delete rules
-				for _, oldIngress := range oldSvc.Status.LoadBalancer.Ingress {
-					oldClusterIP := oldSvc.Spec.ClusterIP
-					oldExternalIP := oldIngress.IP
+				for _, oldExternalIP := range oldExternalIPs {
+					oldClusterIP := oldClusterIPv4
+					if ip.IsIPv6Addr(oldExternalIP) {
+						oldClusterIP = oldClusterIPv6
+					}
 
 					// Delete rules
 					logger.WithValues("externalIP", oldExternalIP).WithValues("clusterIP", oldClusterIP).Info("delete rule externalIp to clusterIP")
@@ -194,10 +207,22 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, nil
 		}
 
-		// Create rules
+		// Get service cluster IPs for each family
+		clusterIPv4 := GetClusterIPByFamily(corev1.IPv4Protocol, svc)
+		clusterIPv6 := GetClusterIPByFamily(corev1.IPv6Protocol, svc)
+
+		// Get all the service's external IPs
+		externalIPs := []string{}
 		for _, ingress := range svc.Status.LoadBalancer.Ingress {
-			clusterIP := svc.Spec.ClusterIP
-			externalIP := ingress.IP
+			externalIPs = append(externalIPs, ingress.IP)
+		}
+
+		// Create rules
+		for _, externalIP := range externalIPs {
+			clusterIP := clusterIPv4
+			if ip.IsIPv6Addr(externalIP) {
+				clusterIP = clusterIPv6
+			}
 
 			// Cache service to use deleting service
 			serviceCache[req] = *svc.DeepCopy()
@@ -218,4 +243,32 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
 		Complete(r)
+}
+
+// GetClusterIPByFamily returns a service clusterip by family
+// Borrowed from https://github.com/kubernetes/kubernetes/blob/v1.20.5/pkg/proxy/util/utils.go#L386-L411
+func GetClusterIPByFamily(ipFamily corev1.IPFamily, service *corev1.Service) string {
+	// allowing skew
+	if len(service.Spec.IPFamilies) == 0 {
+		if len(service.Spec.ClusterIP) == 0 || service.Spec.ClusterIP == corev1.ClusterIPNone {
+			return ""
+		}
+
+		IsIPv6Family := (ipFamily == corev1.IPv6Protocol)
+		if IsIPv6Family == ip.IsIPv6Addr(service.Spec.ClusterIP) {
+			return service.Spec.ClusterIP
+		}
+
+		return ""
+	}
+
+	for idx, family := range service.Spec.IPFamilies {
+		if family == ipFamily {
+			if idx < len(service.Spec.ClusterIPs) {
+				return service.Spec.ClusterIPs[idx]
+			}
+		}
+	}
+
+	return ""
 }
