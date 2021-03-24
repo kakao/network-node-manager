@@ -7,6 +7,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/kakao/network-node-manager/pkg/ip"
 	"github.com/kakao/network-node-manager/pkg/iptables"
+	"github.com/kakao/network-node-manager/pkg/utils"
 )
 
 func InitRulesExternalCluster(logger logr.Logger) error {
@@ -143,7 +144,7 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 		// Make up service map
 		svcMap := make(map[string]*corev1.Service)
 		for _, svc := range svcs.Items {
-			if ip.IsIPv4Addr(svc.Spec.ClusterIP) && svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+			if ip.IsIPv4Addr(utils.GetClusterIPByFamily(corev1.IPv4Protocol, &svc)) && svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
 				svcMap[svc.Namespace+"/"+svc.Name] = svc.DeepCopy()
 			}
 		}
@@ -154,8 +155,10 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 			return err
 		}
 		for _, rule := range preRules {
-			// Get service info from rule and k8s, and delete iptables rules
+			// Get service info from iptables rules
 			nsName, src, dest, jump, dnatDest := getSvcInfoFromRule(rule)
+
+			// Check exist and delete iptables rule
 			svc, ok := svcMap[nsName]
 			if !ok {
 				logger.WithValues("rule", rule).Info("there is no service info in k8s. cleanup prerouting chain IPv4 rule")
@@ -167,11 +170,23 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 				continue
 			}
 
-			// Compare service info and delete iptables rules
+			// Get the service's IPv4 clusterIP and all IPv4 externalIPs
+			clusterIP := utils.GetClusterIPByFamily(corev1.IPv4Protocol, svc)
+			if clusterIP == "" {
+				continue
+			}
+			externalIPs := []string{}
 			for _, ingress := range svc.Status.LoadBalancer.Ingress {
-				externalIP := ingress.IP + "/32"
+				if ip.IsIPv4Addr(ingress.IP) {
+					externalIPs = append(externalIPs, ingress.IP)
+				}
+			}
+
+			// Compare service info and delete iptables rules
+			for _, externalIP := range externalIPs {
+				externalIP = externalIP + "/32"
 				if (jump == ChainNATKubeMarkMasq && (src == podCIDRIPv4 && dest == externalIP)) ||
-					(jump == "DNAT" && (src == podCIDRIPv4 && dest == externalIP && dnatDest == svc.Spec.ClusterIP)) {
+					(jump == "DNAT" && (src == podCIDRIPv4 && dest == externalIP && dnatDest == clusterIP)) {
 					continue
 				}
 				logger.WithValues("rule", rule).Info("service info is diff. cleanup prerouting chain IPv4 rule")
@@ -189,8 +204,10 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 			return err
 		}
 		for _, rule := range outRules {
-			// Get service info from rule and k8s, and delete iptables rules
+			// Get service info from iptables rules
 			nsName, _, dest, jump, dnatDest := getSvcInfoFromRule(rule)
+
+			// Check exist and delete iptables rule
 			svc, ok := svcMap[nsName]
 			if !ok {
 				logger.WithValues("rule", rule).Info("there is no service info in k8s. cleanup output chain IPv4 rule")
@@ -202,11 +219,23 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 				continue
 			}
 
-			// Compare service info and delete diff iptables rules
+			// Get the service's IPv4 clusterIP and all IPv4 externalIPs
+			clusterIP := utils.GetClusterIPByFamily(corev1.IPv4Protocol, svc)
+			if clusterIP == "" {
+				continue
+			}
+			externalIPs := []string{}
 			for _, ingress := range svc.Status.LoadBalancer.Ingress {
-				externalIP := ingress.IP + "/32"
+				if ip.IsIPv4Addr(ingress.IP) {
+					externalIPs = append(externalIPs, ingress.IP)
+				}
+			}
+
+			// Compare service info and delete diff iptables rules
+			for _, externalIP := range externalIPs {
+				externalIP = externalIP + "/32"
 				if (jump == ChainNATKubeMarkMasq && dest == externalIP) ||
-					(jump == "DNAT" && (dest == externalIP && dnatDest == svc.Spec.ClusterIP)) {
+					(jump == "DNAT" && (dest == externalIP && dnatDest == clusterIP)) {
 					continue
 				}
 				logger.WithValues("rule", rule).Info("service info is diff. cleanup output chain IPv4 rule")
@@ -223,7 +252,7 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 		// Make up service map
 		svcMap := make(map[string]*corev1.Service)
 		for _, svc := range svcs.Items {
-			if ip.IsIPv6Addr(svc.Spec.ClusterIP) && svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+			if ip.IsIPv6Addr(utils.GetClusterIPByFamily(corev1.IPv6Protocol, &svc)) && svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
 				svcMap[svc.Namespace+"/"+svc.Name] = svc.DeepCopy()
 			}
 		}
@@ -234,8 +263,10 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 			return err
 		}
 		for _, rule := range preRules {
-			// Get service info from rule and k8s, and delete iptables rules
+			// Get service info from iptables rules
 			nsName, src, dest, jump, dnatDest := getSvcInfoFromRule(rule)
+
+			// Check exist and delete iptables rule
 			svc, ok := svcMap[nsName]
 			if !ok {
 				logger.WithValues("rule", rule).Info("there is no service info in k8s. cleanup prerouting chain IPv6 rule")
@@ -247,11 +278,23 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 				continue
 			}
 
-			// Compare service info and delete iptables rules
+			// Get the service's IPv6 clusterIP and all IPv6 externalIPs
+			clusterIP := utils.GetClusterIPByFamily(corev1.IPv6Protocol, svc)
+			if clusterIP == "" {
+				continue
+			}
+			externalIPs := []string{}
 			for _, ingress := range svc.Status.LoadBalancer.Ingress {
-				externalIP := ingress.IP + "/128"
+				if ip.IsIPv6Addr(ingress.IP) {
+					externalIPs = append(externalIPs, ingress.IP)
+				}
+			}
+
+			// Compare service info and delete iptables rules
+			for _, externalIP := range externalIPs {
+				externalIP = externalIP + "/128"
 				if (jump == ChainNATKubeMarkMasq && (src == podCIDRIPv6 && dest == externalIP)) ||
-					(jump == "DNAT" && (src == podCIDRIPv6 && dest == externalIP && dnatDest == svc.Spec.ClusterIP)) {
+					(jump == "DNAT" && (src == podCIDRIPv6 && dest == externalIP && dnatDest == clusterIP)) {
 					continue
 				}
 				logger.WithValues("rule", rule).Info("service info is diff. cleanup prerouting chain IPv6 rule")
@@ -269,8 +312,10 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 			return err
 		}
 		for _, rule := range outRules {
-			// Get service info from rule and k8s, and delete iptables rules
+			// Get service info from iptables rules
 			nsName, _, dest, jump, dnatDest := getSvcInfoFromRule(rule)
+
+			// Check exist and delete iptables rule
 			svc, ok := svcMap[nsName]
 			if !ok {
 				logger.WithValues("rule", rule).Info("there is no service info in k8s. cleanup output chain IPv6 rule")
@@ -282,11 +327,23 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 				continue
 			}
 
-			// Compare service info and delete diff iptables rules
+			// Get the service's IPv6 clusterIP and all IPv6 externalIPs
+			clusterIP := utils.GetClusterIPByFamily(corev1.IPv6Protocol, svc)
+			if clusterIP == "" {
+				continue
+			}
+			externalIPs := []string{}
 			for _, ingress := range svc.Status.LoadBalancer.Ingress {
-				externalIP := ingress.IP + "/128"
+				if ip.IsIPv6Addr(ingress.IP) {
+					externalIPs = append(externalIPs, ingress.IP)
+				}
+			}
+
+			// Compare service info and delete diff iptables rules
+			for _, externalIP := range externalIPs {
+				externalIP = externalIP + "/128"
 				if (jump == ChainNATKubeMarkMasq && dest == externalIP) ||
-					(jump == "DNAT" && (dest == externalIP && dnatDest == svc.Spec.ClusterIP)) {
+					(jump == "DNAT" && (dest == externalIP && dnatDest == clusterIP)) {
 					continue
 				}
 				logger.WithValues("rule", rule).Info("service info is diff. cleanup output chain IPv6 rule")

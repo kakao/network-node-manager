@@ -53,7 +53,7 @@ func TestIsIPv4Addr(t *testing.T) {
 
 	v = IsIPv4Addr(ipv6Local)
 	if v != false {
-		t.Errorf("wrong - %s", ipv6Local)
+		t.Errorf("wrong result - %s", ipv6Local)
 	}
 }
 
@@ -70,7 +70,7 @@ func TestIsIPv6Addr(t *testing.T) {
 
 	v = IsIPv6Addr(ipv4Local)
 	if v != false {
-		t.Errorf("wrong - %s", ipv4Local)
+		t.Errorf("wrong result - %s", ipv4Local)
 	}
 }
 

@@ -29,6 +29,7 @@ import (
 	"github.com/kakao/network-node-manager/pkg/configs"
 	"github.com/kakao/network-node-manager/pkg/ip"
 	"github.com/kakao/network-node-manager/pkg/rules"
+	"github.com/kakao/network-node-manager/pkg/utils"
 )
 
 // ServiceReconciler reconciles a Service object
@@ -172,11 +173,15 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 					return ctrl.Result{}, nil
 				}
 
-				// Get service cluster IPs for each family
-				oldClusterIPv4 := GetClusterIPByFamily(corev1.IPv4Protocol, &oldSvc)
-				oldClusterIPv6 := GetClusterIPByFamily(corev1.IPv6Protocol, &oldSvc)
+				// Get service's clusterIPs for each family
+				oldClusterIPv4 := utils.GetClusterIPByFamily(corev1.IPv4Protocol, &oldSvc)
+				oldClusterIPv6 := utils.GetClusterIPByFamily(corev1.IPv6Protocol, &oldSvc)
+				if oldClusterIPv4 == "" && oldClusterIPv6 == "" {
+					// If there is no clusterIP in the service, skip it
+					return ctrl.Result{}, nil
+				}
 
-				// Get all the service's external IPs
+				// Get all the service's externalIPs
 				oldExternalIPs := []string{}
 				for _, ingress := range svc.Status.LoadBalancer.Ingress {
 					oldExternalIPs = append(oldExternalIPs, ingress.IP)
@@ -207,11 +212,15 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, nil
 		}
 
-		// Get service cluster IPs for each family
-		clusterIPv4 := GetClusterIPByFamily(corev1.IPv4Protocol, svc)
-		clusterIPv6 := GetClusterIPByFamily(corev1.IPv6Protocol, svc)
+		// Get service's clusterIPs for each family
+		clusterIPv4 := utils.GetClusterIPByFamily(corev1.IPv4Protocol, svc)
+		clusterIPv6 := utils.GetClusterIPByFamily(corev1.IPv6Protocol, svc)
+		if clusterIPv4 == "" && clusterIPv6 == "" {
+			// If there is no clusterIP in the service, skip it
+			return ctrl.Result{}, nil
+		}
 
-		// Get all the service's external IPs
+		// Get all the service's externalIPs
 		externalIPs := []string{}
 		for _, ingress := range svc.Status.LoadBalancer.Ingress {
 			externalIPs = append(externalIPs, ingress.IP)
@@ -243,32 +252,4 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
 		Complete(r)
-}
-
-// GetClusterIPByFamily returns a service clusterip by family
-// Borrowed from https://github.com/kubernetes/kubernetes/blob/v1.20.5/pkg/proxy/util/utils.go#L386-L411
-func GetClusterIPByFamily(ipFamily corev1.IPFamily, service *corev1.Service) string {
-	// allowing skew
-	if len(service.Spec.IPFamilies) == 0 {
-		if len(service.Spec.ClusterIP) == 0 || service.Spec.ClusterIP == corev1.ClusterIPNone {
-			return ""
-		}
-
-		IsIPv6Family := (ipFamily == corev1.IPv6Protocol)
-		if IsIPv6Family == ip.IsIPv6Addr(service.Spec.ClusterIP) {
-			return service.Spec.ClusterIP
-		}
-
-		return ""
-	}
-
-	for idx, family := range service.Spec.IPFamilies {
-		if family == ipFamily {
-			if idx < len(service.Spec.ClusterIPs) {
-				return service.Spec.ClusterIPs[idx]
-			}
-		}
-	}
-
-	return ""
 }
