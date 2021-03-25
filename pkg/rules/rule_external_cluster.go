@@ -144,7 +144,7 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 		// Make up service map
 		svcMap := make(map[string]*corev1.Service)
 		for _, svc := range svcs.Items {
-			if ip.IsIPv4Addr(utils.GetClusterIPByFamily(corev1.IPv4Protocol, &svc)) && svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+			if ip.IsIPv4Addr(utils.GetClusterIPByFamily(corev1.IPv4Protocol, &svc)) {
 				svcMap[svc.Namespace+"/"+svc.Name] = svc.DeepCopy()
 			}
 		}
@@ -179,6 +179,11 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 			for _, ingress := range svc.Status.LoadBalancer.Ingress {
 				if ip.IsIPv4Addr(ingress.IP) {
 					externalIPs = append(externalIPs, ingress.IP)
+				}
+			}
+			for _, externalIP := range svc.Spec.ExternalIPs {
+				if ip.IsIPv4Addr(externalIP) {
+					externalIPs = append(externalIPs, externalIP)
 				}
 			}
 
@@ -230,6 +235,11 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 					externalIPs = append(externalIPs, ingress.IP)
 				}
 			}
+			for _, externalIP := range svc.Spec.ExternalIPs {
+				if ip.IsIPv4Addr(externalIP) {
+					externalIPs = append(externalIPs, externalIP)
+				}
+			}
 
 			// Compare service info and delete diff iptables rules
 			for _, externalIP := range externalIPs {
@@ -252,7 +262,7 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 		// Make up service map
 		svcMap := make(map[string]*corev1.Service)
 		for _, svc := range svcs.Items {
-			if ip.IsIPv6Addr(utils.GetClusterIPByFamily(corev1.IPv6Protocol, &svc)) && svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+			if ip.IsIPv6Addr(utils.GetClusterIPByFamily(corev1.IPv6Protocol, &svc)) {
 				svcMap[svc.Namespace+"/"+svc.Name] = svc.DeepCopy()
 			}
 		}
@@ -287,6 +297,11 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 			for _, ingress := range svc.Status.LoadBalancer.Ingress {
 				if ip.IsIPv6Addr(ingress.IP) {
 					externalIPs = append(externalIPs, ingress.IP)
+				}
+			}
+			for _, externalIP := range svc.Spec.ExternalIPs {
+				if ip.IsIPv6Addr(externalIP) {
+					externalIPs = append(externalIPs, externalIP)
 				}
 			}
 
@@ -336,6 +351,11 @@ func CleanupRulesExternalCluster(logger logr.Logger, svcs *corev1.ServiceList) e
 			for _, ingress := range svc.Status.LoadBalancer.Ingress {
 				if ip.IsIPv6Addr(ingress.IP) {
 					externalIPs = append(externalIPs, ingress.IP)
+				}
+			}
+			for _, externalIP := range svc.Spec.ExternalIPs {
+				if ip.IsIPv6Addr(externalIP) {
+					externalIPs = append(externalIPs, externalIP)
 				}
 			}
 

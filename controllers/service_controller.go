@@ -186,6 +186,9 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				for _, ingress := range svc.Status.LoadBalancer.Ingress {
 					oldExternalIPs = append(oldExternalIPs, ingress.IP)
 				}
+				for _, externalIP := range svc.Spec.ExternalIPs {
+					oldExternalIPs = append(oldExternalIPs, externalIP)
+				}
 
 				// Delete rules
 				for _, oldExternalIP := range oldExternalIPs {
@@ -207,11 +210,6 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 		}
 
-		// Check service is LoadBalancer type
-		if svc.Spec.Type != corev1.ServiceTypeLoadBalancer {
-			return ctrl.Result{}, nil
-		}
-
 		// Get service's clusterIPs for each family
 		clusterIPv4 := utils.GetClusterIPByFamily(corev1.IPv4Protocol, svc)
 		clusterIPv6 := utils.GetClusterIPByFamily(corev1.IPv6Protocol, svc)
@@ -224,6 +222,9 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		externalIPs := []string{}
 		for _, ingress := range svc.Status.LoadBalancer.Ingress {
 			externalIPs = append(externalIPs, ingress.IP)
+		}
+		for _, externalIP := range svc.Spec.ExternalIPs {
+			externalIPs = append(externalIPs, externalIP)
 		}
 
 		// Create rules

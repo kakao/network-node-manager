@@ -24,6 +24,12 @@ var (
 		},
 	}
 
+	noneSvc = corev1.Service{
+		Spec: corev1.ServiceSpec{
+			ClusterIP: corev1.ClusterIPNone,
+		},
+	}
+
 	ipv4SvcFamily = corev1.Service{
 		Spec: corev1.ServiceSpec{
 			IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
@@ -55,6 +61,16 @@ func TestGetClusterIPByFamily(t *testing.T) {
 	clusterIP = GetClusterIPByFamily(corev1.IPv6Protocol, &ipv6Svc)
 	if clusterIP != ipv6Local {
 		t.Errorf("wrong result - ipv6Svc")
+	}
+
+	clusterIP = GetClusterIPByFamily(corev1.IPv4Protocol, &noneSvc)
+	if clusterIP != "" {
+		t.Errorf("wrong result - noneSvc - ipv4")
+	}
+
+	clusterIP = GetClusterIPByFamily(corev1.IPv6Protocol, &noneSvc)
+	if clusterIP != "" {
+		t.Errorf("wrong result - noneSvc - ipv6")
 	}
 
 	clusterIP = GetClusterIPByFamily(corev1.IPv4Protocol, &ipv4SvcFamily)
