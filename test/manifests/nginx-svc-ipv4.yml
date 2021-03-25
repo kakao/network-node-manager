@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-ipv4
+  namespace: default
+spec:
+  externalTrafficPolicy: Local
+  externalIPs:
+  - 192.168.100.1
+  ipFamilies:
+  - IPv4
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    run: nginx
+  type: LoadBalancer
