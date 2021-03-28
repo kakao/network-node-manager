@@ -88,6 +88,14 @@ spec:
         securityContext:
           capabilities:
             add: ["NET_ADMIN"]
+        volumeMounts:
+        - mountPath: /run/xtables.lock
+          name: xtables-lock
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
+      volumes:
+      - name: xtables-lock
+        hostPath:
+          path: /run/xtables.lock
+          type: FileOrCreate
