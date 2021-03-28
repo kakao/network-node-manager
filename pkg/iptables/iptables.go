@@ -17,6 +17,10 @@ const (
 	iptablesSaveCmdIPv4 = "iptables-save"
 	iptablesSaveCmdIPv6 = "ip6tables-save"
 
+	// kube-proxy defaults
+	iptablesWaitSeconds          = "5"
+	iptablesWaitIntervalUseconds = "100000"
+
 	iptablesErrNoRule   = "No chain/target/match by that name"
 	iptablesErrNoTarget = "Couldn't load target"
 
@@ -44,12 +48,8 @@ func isExistChain(iptablesCmd string, table Table, chain string) bool {
 	lock.Lock()
 	defer lock.Unlock()
 
-	// Set Common args
-	args := []string{"-t", string(table)}
-
 	// Check chain
-	cmd := exec.Command(iptablesCmd, append(args, "-L", chain)...)
-	_, err := cmd.CombinedOutput()
+	_, err := runIptables(iptablesCmd, table, "-L", chain)
 	if err != nil {
 		return false
 	}
@@ -70,20 +70,15 @@ func createChain(iptablesCmd string, table Table, chain string) (string, error) 
 	lock.Lock()
 	defer lock.Unlock()
 
-	// Set Common args
-	args := []string{"-t", string(table)}
-
 	// Check chain
-	cmd := exec.Command(iptablesCmd, append(args, "-L", chain)...)
-	out, err := cmd.CombinedOutput()
+	out, err := runIptables(iptablesCmd, table, "-L", chain)
 	if err == nil {
 		// If already exists, return success
 		return string(out), nil
 	}
 
 	// Create chain
-	cmd = exec.Command(iptablesCmd, append(args, "-N", chain)...)
-	out, err = cmd.CombinedOutput()
+	out, err = runIptables(iptablesCmd, table, "-N", chain)
 	if err != nil {
 		return string(out), err
 	}
@@ -105,27 +100,21 @@ func deleteChain(iptablesCmd string, table Table, chain string) (string, error) 
 	lock.Lock()
 	defer lock.Unlock()
 
-	// Set Common args
-	args := []string{"-t", string(table)}
-
 	// Check chain
-	cmd := exec.Command(iptablesCmd, append(args, "-L", chain)...)
-	out, err := cmd.CombinedOutput()
+	out, err := runIptables(iptablesCmd, table, "-L", chain)
 	if err != nil {
 		// If chain isn't exist, return success
 		return string(out), nil
 	}
 
 	// Flush chain
-	cmd = exec.Command(iptablesCmd, append(args, "-F", chain)...)
-	out, err = cmd.CombinedOutput()
+	out, err = runIptables(iptablesCmd, table, "-F", chain)
 	if err != nil {
 		return string(out), err
 	}
 
 	// Delete chain
-	cmd = exec.Command(iptablesCmd, append(args, "-X", chain)...)
-	out, err = cmd.CombinedOutput()
+	out, err = runIptables(iptablesCmd, table, "-X", chain)
 	if err != nil {
 		return string(out), err
 	}
@@ -148,14 +137,13 @@ func isExistRule(iptablesCmd string, table Table, chain string, comment string, 
 	defer lock.Unlock()
 
 	// Set Common args
-	args := []string{"-t", string(table)}
+	args := []string{"-C", chain}
 	if comment != "" {
 		args = append(args, "-m", "comment", "--comment", comment)
 	}
 
 	// Check rule
-	cmd := exec.Command(iptablesCmd, append(append(args, "-C", chain), rule...)...)
-	_, err := cmd.CombinedOutput()
+	_, err := runIptables(iptablesCmd, table, append(args, rule...)...)
 	if err != nil {
 		return false
 	}
@@ -211,21 +199,19 @@ func createRuleFirst(iptablesCmd string, table Table, chain string, comment stri
 	defer lock.Unlock()
 
 	// Set Common args
-	args := []string{"-t", string(table)}
+	args := []string{}
 	if comment != "" {
 		args = append(args, "-m", "comment", "--comment", comment)
 	}
 
 	// Check rule
-	cmd := exec.Command(iptablesCmd, append(append(args, "-C", chain), rule...)...)
-	out, err := cmd.CombinedOutput()
+	out, err := runIptables(iptablesCmd, table, append(append(args, "-C", chain), rule...)...)
 	if err == nil { // If already exists, return success
 		return string(out), nil
 	}
 
 	// Create rule
-	cmd = exec.Command(iptablesCmd, append(append(args, "-I", chain, "1"), rule...)...)
-	out, err = cmd.CombinedOutput()
+	out, err = runIptables(iptablesCmd, table, append(append(args, "-I", chain, "1"), rule...)...)
 	if err != nil {
 		return string(out), err
 	}
@@ -248,22 +234,20 @@ func createRuleLast(iptablesCmd string, table Table, chain string, comment strin
 	defer lock.Unlock()
 
 	// Set Common args
-	args := []string{"-t", string(table)}
+	args := []string{}
 	if comment != "" {
 		args = append(args, "-m", "comment", "--comment", comment)
 	}
 
 	// Check rule
-	cmd := exec.Command(iptablesCmd, append(append(args, "-C", chain), rule...)...)
-	out, err := cmd.CombinedOutput()
+	out, err := runIptables(iptablesCmd, table, append(append(args, "-C", chain), rule...)...)
 	if err == nil {
 		// If already exists, return success
 		return string(out), nil
 	}
 
 	// Create rule
-	cmd = exec.Command(iptablesCmd, append(append(args, "-A", chain), rule...)...)
-	out, err = cmd.CombinedOutput()
+	out, err = runIptables(iptablesCmd, table, append(append(args, "-A", chain), rule...)...)
 	if err != nil {
 		return string(out), err
 	}
@@ -286,14 +270,13 @@ func deleteRule(iptablesCmd string, table Table, chain string, comment string, r
 	defer lock.Unlock()
 
 	// Set Common args
-	args := []string{"-t", string(table)}
+	args := []string{}
 	if comment != "" {
 		args = append(args, "-m", "comment", "--comment", comment)
 	}
 
 	// Check rule
-	cmd := exec.Command(iptablesCmd, append(append(args, "-C", chain), rule...)...)
-	out, err := cmd.CombinedOutput()
+	out, err := runIptables(iptablesCmd, table, append(append(args, "-C", chain), rule...)...)
 	if err != nil {
 		if strings.Contains(string(out), iptablesErrNoRule) {
 			// If rule isn't exist, return success
@@ -306,8 +289,7 @@ func deleteRule(iptablesCmd string, table Table, chain string, comment string, r
 	}
 
 	// Delete rule
-	cmd = exec.Command(iptablesCmd, append(append(args, "-D", chain), rule...)...)
-	out, err = cmd.CombinedOutput()
+	out, err = runIptables(iptablesCmd, table, append(append(args, "-D", chain), rule...)...)
 	if err != nil {
 		return string(out), err
 	}
@@ -329,12 +311,8 @@ func deleteRuleRaw(iptablesCmd string, table Table, rule ...string) (string, err
 	lock.Lock()
 	defer lock.Unlock()
 
-	// Set tables args
-	args := []string{"-t", string(table)}
-
 	// Check rule
-	cmd := exec.Command(iptablesCmd, append(append(args, "-C"), rule...)...)
-	out, err := cmd.CombinedOutput()
+	out, err := runIptables(iptablesCmd, table, append([]string{"-C"}, rule...)...)
 	if err != nil {
 		if strings.Contains(string(out), iptablesErrNoRule) {
 			// If rule isn't exist, return success
@@ -344,11 +322,27 @@ func deleteRuleRaw(iptablesCmd string, table Table, rule ...string) (string, err
 	}
 
 	// Delete rule
-	cmd = exec.Command(iptablesCmd, append(append(args, "-D"), rule...)...)
-	out, err = cmd.CombinedOutput()
+	out, err = runIptables(iptablesCmd, table, append([]string{"-D"}, rule...)...)
 	if err != nil {
 		return string(out), err
 	}
 
 	return string(out), nil
+}
+
+// Run iptables with lock
+func runIptables(iptablesCmd string, table Table, args ...string) ([]byte, error) {
+	// Build arguments list
+	fullArgs := []string{
+		"-w", iptablesWaitSeconds,
+		"-W", iptablesWaitIntervalUseconds,
+		"-t", string(table),
+	}
+	fullArgs = append(fullArgs, args...)
+
+	// Check chain
+	cmd := exec.Command(iptablesCmd, fullArgs...)
+	out, err := cmd.CombinedOutput()
+
+	return out, err
 }
