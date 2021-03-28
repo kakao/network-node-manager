@@ -15,8 +15,8 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GO111MODULE=on go build -a -o network-node-manager main.go
 
 # Build image
-FROM alpine:3.11.6
-RUN apk add iptables=1.8.3-r2 ip6tables=1.8.3-r2
+FROM alpine:3.13.3
+RUN apk add --no-cache iptables=1.8.6-r0 ip6tables=1.8.6-r0
 
 WORKDIR /
 COPY --from=builder /workspace/network-node-manager .
