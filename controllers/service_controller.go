@@ -90,8 +90,8 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			logger.Error(err, "config error")
 			os.Exit(1)
 		}
-		logger.WithValues("enabled", configRuleDropInvalidInputEnabled).Info("config rule drop invalid packet in INPUT chain")
-		logger.WithValues("enabled", configRuleExternalClusterEnabled).Info("config rule externalIP to clusterIP")
+		logger.WithValues("enabled", configRuleDropInvalidInputEnabled).Info("config for drop invalid packet in INPUT chain")
+		logger.WithValues("enabled", configRuleExternalClusterEnabled).Info("config for externalIP to clusterIP")
 
 		// Init packages
 		rules.Init(configPodCIDRIPv4, configPodCIDRIPv6)
@@ -99,12 +99,12 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Init or Cleanup rules
 		if configRuleDropInvalidInputEnabled {
 			if err := rules.InitRulesDropInvalidInput(logger); err != nil {
-				logger.Error(err, "failed to init rule drop invalid packet in INPUT chain")
+				logger.Error(err, "failed to initalize rules for drop invalid packet in INPUT chain")
 				os.Exit(1)
 			}
 		} else {
 			if err := rules.CleanupRulesDropInvalidInput(logger); err != nil {
-				logger.Error(err, "failed to cleanup rule drop invalid packet in INPUT chain")
+				logger.Error(err, "failed to cleanup rules for drop invalid packet in INPUT chain")
 				os.Exit(1)
 			}
 		}
@@ -112,7 +112,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if configRuleExternalClusterEnabled {
 			// Init externalIP to clusterIP rules
 			if err := rules.InitRulesExternalCluster(logger); err != nil {
-				logger.Error(err, "failed to initalize rule externalIP to clusterIP")
+				logger.Error(err, "failed to initalize rules for externalIP to clusterIP")
 				os.Exit(1)
 			}
 
@@ -144,7 +144,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 				if configRuleDropInvalidInputEnabled {
 					if err := rules.InitRulesDropInvalidInput(logger); err != nil {
-						logger.Error(err, "failed to init rule drop invalid packet in INPUT chain")
+						logger.Error(err, "failed to set rules for drop invalid packet in INPUT chain")
 					}
 				}
 			}
@@ -155,7 +155,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if configRuleExternalClusterEnabled {
 		// In case the iptables chain is deleted, initalize again
 		if err := rules.InitRulesExternalCluster(logger); err != nil {
-			logger.Error(err, "failed to initalize rule externalIP to clusterIP")
+			logger.Error(err, "failed to initalize rules externalIP to clusterIP")
 			os.Exit(1)
 		}
 
@@ -183,10 +183,10 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 				// Get all the service's externalIPs
 				oldExternalIPs := []string{}
-				for _, ingress := range svc.Status.LoadBalancer.Ingress {
+				for _, ingress := range oldSvc.Status.LoadBalancer.Ingress {
 					oldExternalIPs = append(oldExternalIPs, ingress.IP)
 				}
-				for _, externalIP := range svc.Spec.ExternalIPs {
+				for _, externalIP := range oldSvc.Spec.ExternalIPs {
 					oldExternalIPs = append(oldExternalIPs, externalIP)
 				}
 
@@ -198,7 +198,8 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 					}
 
 					// Delete rules
-					logger.WithValues("externalIP", oldExternalIP).WithValues("clusterIP", oldClusterIP).Info("delete rule externalIp to clusterIP")
+					logger.WithValues("externalIP", oldExternalIP).WithValues("clusterIP", oldClusterIP).
+						Info("delete a iptables rule for externalIp to clusterIP")
 					if err := rules.DeleteRulesExternalCluster(logger, &req, oldClusterIP, oldExternalIP); err != nil {
 						return ctrl.Result{}, err
 					}
@@ -238,7 +239,8 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			serviceCache[req] = *svc.DeepCopy()
 
 			// Create rules
-			logger.WithValues("externalIP", externalIP).WithValues("clusterIP", clusterIP).Info("create iptables rules")
+			logger.WithValues("externalIP", externalIP).WithValues("clusterIP", clusterIP).
+				Info("create a iptables rule for externalIP to clusterIP")
 			if err := rules.CreateRulesExternalCluster(logger, &req, clusterIP, externalIP); err != nil {
 				return ctrl.Result{}, err
 			}
