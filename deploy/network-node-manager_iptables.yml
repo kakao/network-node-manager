@@ -67,6 +67,7 @@ spec:
         control-plane: network-node-manager
     spec:
       serviceAccountName: network-node-manager
+      priorityClassName: system-node-critical
       hostNetwork: true
       containers:
       - command:
