@@ -49,7 +49,7 @@ func isExistChain(iptablesCmd string, table Table, chain string) bool {
 	defer lock.Unlock()
 
 	// Check chain
-	_, err := runIptables(iptablesCmd, table, "-L", chain)
+	_, err := runIptables(iptablesCmd, table, "-nL", chain)
 	if err != nil {
 		return false
 	}
@@ -71,7 +71,7 @@ func createChain(iptablesCmd string, table Table, chain string) (string, error) 
 	defer lock.Unlock()
 
 	// Check chain
-	out, err := runIptables(iptablesCmd, table, "-L", chain)
+	out, err := runIptables(iptablesCmd, table, "-nL", chain)
 	if err == nil {
 		// If already exists, return success
 		return string(out), nil
@@ -101,7 +101,7 @@ func deleteChain(iptablesCmd string, table Table, chain string) (string, error) 
 	defer lock.Unlock()
 
 	// Check chain
-	out, err := runIptables(iptablesCmd, table, "-L", chain)
+	out, err := runIptables(iptablesCmd, table, "-nL", chain)
 	if err != nil {
 		// If chain isn't exist, return success
 		return string(out), nil
