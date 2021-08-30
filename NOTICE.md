@@ -4,6 +4,12 @@ This application is Copyright © Kakao Corp. All rights reserved.
 
 The following sets forth attribution notices for third party software that may be contained in this application.
 
+ **iptables-wrappers**
+
+https://github.com/kubernetes-sigs/iptables-wrappers/
+
+Apache License 2.0
+ 
  **Ginkgo**
 
 https://github.com/onsi/ginkgo

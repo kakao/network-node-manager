@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"bytes"
 )
 
 // Type
@@ -169,13 +170,16 @@ func getRules(iptablesSaveCmd string, table Table, chain string) ([]string, erro
 
 	// Check rule
 	cmd := exec.Command(iptablesSaveCmd, args...)
-	out, err := cmd.CombinedOutput()
+	var stdout, stderr bytes.Buffer
+        cmd.Stdout = &stdout
+        cmd.Stderr = &stderr
+        err := cmd.Run()
 	if err != nil {
 		return nil, err
 	}
 
 	var result []string
-	for _, rule := range strings.Split(string(out), "\n") {
+	for _, rule := range strings.Split(string(stdout.Bytes()), "\n") {
 		if strings.HasPrefix(rule, "-A "+chain) {
 			result = append(result, rule)
 		}
