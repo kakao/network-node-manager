@@ -10,6 +10,7 @@ COPY go.sum go.sum
 COPY main.go main.go
 COPY controllers/ controllers/
 COPY pkg/ pkg/
+COPY scripts/ controllers/
 
 # Build network-node-manager
 RUN CGO_ENABLED=0 GO111MODULE=on go build -a -o network-node-manager main.go
@@ -19,7 +20,7 @@ FROM alpine:3.14.2
 RUN apk add --no-cache iptables=1.8.7-r1 ip6tables=1.8.7-r1
 COPY scripts/iptables-wrapper-installer.sh /
 RUN chmod 0744 /iptables-wrapper-installer.sh 
-RUN /iptables-wrapper-installer.sh
+RUN /iptables-wrapper-installer.sh --no-sanity-check
 
 WORKDIR /
 COPY --from=builder /workspace/network-node-manager .
