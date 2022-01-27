@@ -2,10 +2,10 @@
 package iptables
 
 import (
+	"bytes"
 	"os/exec"
 	"strings"
 	"sync"
-	"bytes"
 )
 
 // Type
@@ -51,10 +51,7 @@ func isExistChain(iptablesCmd string, table Table, chain string) bool {
 
 	// Check chain
 	_, err := runIptables(iptablesCmd, table, "-nL", chain)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 // CreateChain
@@ -145,10 +142,7 @@ func isExistRule(iptablesCmd string, table Table, chain string, comment string, 
 
 	// Check rule
 	_, err := runIptables(iptablesCmd, table, append(args, rule...)...)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 // GetRules
@@ -168,18 +162,20 @@ func getRules(iptablesSaveCmd string, table Table, chain string) ([]string, erro
 	// Set Common args
 	args := []string{"-t", string(table)}
 
-	// Check rule
-	cmd := exec.Command(iptablesSaveCmd, args...)
+	// Set command
 	var stdout, stderr bytes.Buffer
-        cmd.Stdout = &stdout
-        cmd.Stderr = &stderr
-        err := cmd.Run()
-	if err != nil {
+	cmd := exec.Command(iptablesSaveCmd, args...)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	// Check rule
+	if err := cmd.Run(); err != nil {
 		return nil, err
 	}
 
+	// Parsing and set result
 	var result []string
-	for _, rule := range strings.Split(string(stdout.Bytes()), "\n") {
+	for _, rule := range strings.Split(stdout.String(), "\n") {
 		if strings.HasPrefix(rule, "-A "+chain) {
 			result = append(result, rule)
 		}
@@ -334,7 +330,7 @@ func deleteRuleRaw(iptablesCmd string, table Table, rule ...string) (string, err
 	return string(out), nil
 }
 
-// Run iptables with lock
+// Run iptables within lock
 func runIptables(iptablesCmd string, table Table, args ...string) ([]byte, error) {
 	// Build arguments list
 	fullArgs := []string{
@@ -344,9 +340,15 @@ func runIptables(iptablesCmd string, table Table, args ...string) ([]byte, error
 	}
 	fullArgs = append(fullArgs, args...)
 
-	// Check chain
+	// Set command
+	var stdout, stderr bytes.Buffer
 	cmd := exec.Command(iptablesCmd, fullArgs...)
-	out, err := cmd.CombinedOutput()
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
-	return out, err
+	// Apply rule
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+	return stdout.Bytes(), nil
 }
