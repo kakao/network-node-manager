@@ -74,7 +74,7 @@ $ kubectl -n kube-system set env daemonset/network-node-manager RULE_EXTERNAL_CL
 
 ## How it works?
 
-![kpexec Architecture](img/network-node-manager_Architecture.PNG)
+![network-node-manager Architecture](img/network-node-manager_Architecture.PNG)
 
 network-node-manager runs on all kubernetes cluster nodes in host network namespace with network privileges and manage the node network configuration. network-node-manager watches the kubernetes object through kubenetes API server like a general kubernetes controller and manage the node network configuration. Now network-node-manager only watches service object.
 

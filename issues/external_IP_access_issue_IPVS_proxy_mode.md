@@ -1,7 +1,7 @@
 # External-IP Access Issue with IPVS Proxy Mode
 
-When using IPVS proxy mode, External-IP assigned through the LoadBalancer type service with externalTrafficPolcy=Local option cannot be accessed from inside the cluster. Currently kubernetes is not preparing any patch to fix this issue.
-
+When using **IPVS kube-proxy mode**, External-IP assigned through the LoadBalancer type service with externalTrafficPolcy=Local option **cannot be accessed from inside the cluster**. Currently kubernetes is not preparing any patch to fix this issue.
+
 ## How to solve it
 
 network-node-manager adds the DNAT rules for each LoadBalancer type service. One is added to the prerouting chain and the other is added to the output chain. The DNAT rule in the prerouting chain is for the pod that uses pod-only network namespace. On the other hand, The DNAT rule in the output chain is for the pod that uses host network namespace. All DNAT rules only target packets from pods on the host. Below are example rules set by network-node-manager.
