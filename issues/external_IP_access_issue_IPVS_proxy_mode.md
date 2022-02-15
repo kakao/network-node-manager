@@ -1,6 +1,6 @@
 # External-IP Access Issue with IPVS Proxy Mode
 
-When using **IPVS kube-proxy mode**, External-IP assigned through the LoadBalancer type service with externalTrafficPolcy=Local option **cannot be accessed from inside the cluster**. Currently kubernetes is not preparing any patch to fix this issue.
+When using **IPVS kube-proxy mode**, External-IP assigned through the LoadBalancer type service with externalTrafficPolicy=Local option **cannot be accessed from inside the cluster**. Currently kubernetes is not preparing any patch to fix this issue.
 
 ## How to solve it
 
